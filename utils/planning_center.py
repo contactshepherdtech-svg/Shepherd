@@ -1,24 +1,107 @@
 import os
+from datetime import datetime, timedelta
+
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()
+from data.schema import IntegrationToken, SessionLocal
+from utils.planning_center_oauth import refresh_access_token
 
-PCO_CLIENT_ID = os.getenv("PCO_CLIENT_ID")
-PCO_CLIENT_SECRET = os.getenv("PCO_CLIENT_SECRET")
+
+load_dotenv()
 
 BASE_URL = "https://api.planningcenteronline.com"
 
 
+def _legacy_credentials():
+    client_id = os.getenv("PCO_CLIENT_ID") or os.getenv("PLANNING_CENTER_CLIENT_ID")
+    client_secret = os.getenv("PCO_CLIENT_SECRET") or os.getenv("PLANNING_CENTER_CLIENT_SECRET")
+    return client_id, client_secret
+
+
+def _save_refreshed_token(db, token_record, token_payload):
+    access_token = token_payload.get("access_token")
+    if not access_token:
+        raise RuntimeError("Planning Center OAuth refresh did not return an access token.")
+
+    token_record.access_token = access_token
+    if token_payload.get("refresh_token"):
+        token_record.refresh_token = token_payload["refresh_token"]
+
+    expires_in = token_payload.get("expires_in")
+    if expires_in is not None:
+        try:
+            token_record.expires_at = datetime.utcnow() + timedelta(seconds=int(expires_in))
+        except (TypeError, ValueError):
+            token_record.expires_at = None
+
+    if token_payload.get("scope"):
+        token_record.scope = str(token_payload["scope"])
+
+    token_record.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(token_record)
+    return token_record.access_token
+
+
+def _get_oauth_access_token(force_refresh=False):
+    db = SessionLocal()
+    try:
+        token_record = (
+            db.query(IntegrationToken)
+            .filter(IntegrationToken.provider == "planning_center")
+            .first()
+        )
+        if token_record is None or not token_record.access_token:
+            return None
+
+        should_refresh = force_refresh
+        if token_record.expires_at and token_record.refresh_token:
+            should_refresh = should_refresh or (
+                token_record.expires_at <= datetime.utcnow() + timedelta(minutes=2)
+            )
+
+        if should_refresh and token_record.refresh_token:
+            refreshed = refresh_access_token(token_record.refresh_token)
+            return _save_refreshed_token(db, token_record, refreshed)
+
+        return token_record.access_token
+    finally:
+        db.close()
+
+
+def _request_with_bearer(endpoint, params, access_token):
+    response = requests.get(
+        f"{BASE_URL}{endpoint}",
+        headers={"Authorization": f"Bearer {access_token}"},
+        params=params,
+        timeout=20,
+    )
+    return response
+
+
 def pco_get(endpoint, params=None):
-    if not PCO_CLIENT_ID or not PCO_CLIENT_SECRET:
-        raise ValueError("Missing PCO_CLIENT_ID or PCO_CLIENT_SECRET in .env")
+    oauth_access_token = _get_oauth_access_token()
+    if oauth_access_token:
+        response = _request_with_bearer(endpoint, params, oauth_access_token)
+        if response.status_code == 401:
+            refreshed_access_token = _get_oauth_access_token(force_refresh=True)
+            if refreshed_access_token and refreshed_access_token != oauth_access_token:
+                response = _request_with_bearer(endpoint, params, refreshed_access_token)
+        response.raise_for_status()
+        return response.json()
+
+    client_id, client_secret = _legacy_credentials()
+    if not client_id or not client_secret:
+        raise ValueError(
+            "Missing Planning Center credentials. Set OAuth tokens or PCO_CLIENT_ID/PCO_CLIENT_SECRET."
+        )
 
     response = requests.get(
         f"{BASE_URL}{endpoint}",
-        auth=(PCO_CLIENT_ID, PCO_CLIENT_SECRET),
+        auth=(client_id, client_secret),
         params=params,
-        timeout=20
+        timeout=20,
     )
 
     response.raise_for_status()

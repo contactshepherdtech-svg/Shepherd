@@ -91,6 +91,23 @@ class ChurchSettings(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class IntegrationToken(Base):
+    __tablename__ = "integration_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    provider = Column(String, unique=True, index=True)
+    access_token = Column(String)
+    refresh_token = Column(String)
+    expires_at = Column(DateTime)
+    scope = Column(String)
+    connection_status = Column(String, default="connected")
+    last_sync_at = Column(DateTime)
+    members_imported = Column(Integer, default=0)
+    attendance_imported = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 def init_db():
     try:
         Base.metadata.create_all(bind=engine)
@@ -106,6 +123,27 @@ def init_db():
         with engine.begin() as connection:
             connection.exec_driver_sql("ALTER TABLE members ADD COLUMN email VARCHAR")
         logger.info("Added missing members.email column.")
+
+    integration_columns = {
+        column["name"] for column in inspector.get_columns("integration_tokens")
+    }
+    with engine.begin() as connection:
+        if "connection_status" not in integration_columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE integration_tokens ADD COLUMN connection_status VARCHAR"
+            )
+        if "last_sync_at" not in integration_columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE integration_tokens ADD COLUMN last_sync_at TIMESTAMP"
+            )
+        if "members_imported" not in integration_columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE integration_tokens ADD COLUMN members_imported INTEGER"
+            )
+        if "attendance_imported" not in integration_columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE integration_tokens ADD COLUMN attendance_imported INTEGER"
+            )
 
     db = SessionLocal()
     try:
