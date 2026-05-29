@@ -36,6 +36,7 @@ type PlanningCenterConnectionPanelProps = SharedPanelProps & {
 
 type SyncStatusPanelProps = SharedPanelProps & {
   connection: PlanningCenterConnection | null;
+  onSyncComplete: () => Promise<void> | void;
 };
 
 type ChurchSettingsPanelProps = SharedPanelProps & {
@@ -84,8 +85,14 @@ export function PlanningCenterConnectionPanel({
       icon={Cable}
       actions={
         <>
-          <Button variant="secondary">Reconnect Planning Center</Button>
-          <Button>Open OAuth Flow</Button>
+          <Button variant="secondary" asChild>
+            <a href="/api/planning-center/connect">Reconnect Planning Center</a>
+          </Button>
+          <Button asChild>
+            <a href="/api/planning-center/connect">
+              {connected ? "Update Authorization" : "Connect Planning Center"}
+            </a>
+          </Button>
         </>
       }
     >
@@ -110,7 +117,9 @@ export function PlanningCenterConnectionPanel({
   );
 }
 
-export function SyncStatusPanel({ connection, loading = false }: SyncStatusPanelProps) {
+export function SyncStatusPanel({ connection, loading = false, onSyncComplete }: SyncStatusPanelProps) {
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const hasLastSync = Boolean(connection?.last_sync_at);
   const lastSync = hasLastSync ? new Date(connection!.last_sync_at as string) : null;
   const lastSyncLabel =
@@ -122,6 +131,31 @@ export function SyncStatusPanel({ connection, loading = false }: SyncStatusPanel
         })
       : "Not synced yet";
 
+  const onRunSyncNow = async () => {
+    setSyncing(true);
+    setSyncMessage(null);
+
+    try {
+      const response = await fetch("/api/sync", {
+        method: "POST",
+      });
+      const result = (await response.json().catch(() => null)) as { success?: boolean; error?: string } | null;
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "Sync failed.");
+      }
+
+      await onSyncComplete();
+      setSyncMessage({ tone: "success", text: "Sync completed." });
+    } catch (error) {
+      console.error("Failed to run sync", error);
+      const errorText = error instanceof Error ? error.message : "Could not run sync. Try again.";
+      setSyncMessage({ tone: "error", text: errorText });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <Panel
       title="Sync Status"
@@ -130,7 +164,9 @@ export function SyncStatusPanel({ connection, loading = false }: SyncStatusPanel
       actions={
         <>
           <Button variant="secondary">Reconnect</Button>
-          <Button>Run Sync Now</Button>
+          <Button onClick={onRunSyncNow} disabled={loading || syncing}>
+            {syncing ? "Syncing..." : "Run Sync Now"}
+          </Button>
         </>
       }
     >
@@ -149,6 +185,17 @@ export function SyncStatusPanel({ connection, loading = false }: SyncStatusPanel
             <p className="mt-1 text-lg font-semibold">{loading ? "—" : connection?.attendance_imported ?? 0}</p>
           </div>
         </div>
+        {syncMessage ? (
+          <div
+            className={`rounded-lg border px-3 py-2 text-sm ${
+              syncMessage.tone === "success"
+                ? "border-primary/25 bg-primary/8 text-primary"
+                : "border-red-200 bg-red-50 text-red-700"
+            }`}
+          >
+            {syncMessage.text}
+          </div>
+        ) : null}
       </div>
     </Panel>
   );

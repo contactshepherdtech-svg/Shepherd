@@ -420,3 +420,4 @@ export function getPriorityOutreachRows(memberRows: MemberDirectoryRow[]): Membe
     .filter((row) => row.risk.tier === "Watch" || row.risk.tier === "At Risk" || row.risk.tier === "Critical")
     .sort((left, right) => (right.risk.score ?? -1) - (left.risk.score ?? -1));
 }
+

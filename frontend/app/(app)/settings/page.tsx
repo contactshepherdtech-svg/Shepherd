@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Database, HeartHandshake } from "lucide-react";
 
 import {
@@ -25,50 +25,56 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<ChurchSettingsRecord | null>(null);
   const [connection, setConnection] = useState<PlanningCenterConnection | null>(null);
 
+  const loadSettings = useCallback(async () => {
+    setLoading(true);
+
+    const church = await getDefaultChurch();
+    if (!church) {
+      setChurchId(null);
+      setChurchName("Unknown Church");
+      setSettings(null);
+      setConnection(null);
+      setLoading(false);
+      return;
+    }
+
+    const [churchSettings, planningCenterConnection] = await Promise.all([
+      getChurchSettings(church.id),
+      getPlanningCenterConnection(church.id),
+    ]);
+
+    setChurchId(church.id);
+    setChurchName(church.name?.trim() || "Unknown Church");
+    setSettings(churchSettings);
+    setConnection(planningCenterConnection);
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
     let active = true;
 
-    const loadSettings = async () => {
-      setLoading(true);
-
-      const church = await getDefaultChurch();
-      if (!church) {
-        if (active) {
-          setChurchId(null);
-          setChurchName("Unknown Church");
-          setSettings(null);
-          setConnection(null);
-          setLoading(false);
+    const loadActiveSettings = async () => {
+      try {
+        await loadSettings();
+      } finally {
+        if (!active) {
+          return;
         }
-        return;
-      }
-
-      const [churchSettings, planningCenterConnection] = await Promise.all([
-        getChurchSettings(church.id),
-        getPlanningCenterConnection(church.id),
-      ]);
-
-      if (active) {
-        setChurchId(church.id);
-        setChurchName(church.name?.trim() || "Unknown Church");
-        setSettings(churchSettings);
-        setConnection(planningCenterConnection);
-        setLoading(false);
       }
     };
 
-    void loadSettings();
+    void loadActiveSettings();
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [loadSettings]);
 
   return (
     <PageShell>
       <section className="grid gap-4 xl:grid-cols-2">
         <PlanningCenterConnectionPanel connection={connection} churchName={churchName} loading={loading} />
-        <SyncStatusPanel connection={connection} loading={loading} />
+        <SyncStatusPanel connection={connection} loading={loading} onSyncComplete={loadSettings} />
       </section>
 
       <section>

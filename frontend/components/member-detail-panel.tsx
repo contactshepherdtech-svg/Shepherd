@@ -4,11 +4,11 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Activity,
-  CalendarClock,
+  Check,
   ClipboardList,
+  Copy,
   Mail,
   MessageSquare,
-  Phone,
   ShieldAlert,
   Sparkles,
 } from "lucide-react";
@@ -18,6 +18,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { MemberDirectoryRow } from "@/lib/data";
 import { formatDate, formatRelativeDays } from "@/lib/format";
+
+type OutreachType = "email" | "sms";
+
+type DraftResult =
+  | { type: "email"; subject: string; body: string; source: "openrouter" | "fallback"; model: string | null }
+  | { type: "sms"; body: string; source: "openrouter" | "fallback"; model: string | null };
 
 const tierActionMap: Record<string, string> = {
   Healthy: "No action needed",
@@ -84,37 +90,15 @@ function getAttendanceTrend(attendanceHistory: Date[]) {
   return "Stable";
 }
 
-function buildEmailTemplate(row: MemberDirectoryRow) {
-  return [
-    `Hi ${row.member.name.split(" ")[0]},`,
-    "",
-    "I wanted to check in and let you know we have been thinking about you.",
-    "If there’s anything our church family can pray for or support, we would love to connect.",
-    "",
-    "Grace and peace,",
-    "Shepherd Care Team",
-  ].join("\n");
-}
-
-function buildSmsTemplate(row: MemberDirectoryRow) {
-  return `Hi ${row.member.name.split(" ")[0]} — just checking in from Shepherd. We’ve missed seeing you recently. How can we support you this week?`;
-}
-
-function buildCallScriptTemplate(row: MemberDirectoryRow) {
-  return [
-    `Call Script for ${row.member.name}`,
-    "",
-    "1) Start warmly and thank them for their time.",
-    "2) Ask how they have been doing recently.",
-    "3) Share that the church has missed them and wants to support them.",
-    "4) Offer prayer and ask about practical needs.",
-    "5) Close with a clear follow-up step.",
-  ].join("\n");
-}
+type GmailDraftStatus = "idle" | "creating" | "success" | "error";
 
 export function MemberDetailPanel({ row }: MemberDetailPanelProps) {
-  const [outreachDraft, setOutreachDraft] = useState<string>("");
-  const [actionStatus, setActionStatus] = useState<string>("");
+  const [generating, setGenerating] = useState<OutreachType | null>(null);
+  const [draft, setDraft] = useState<DraftResult | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [gmailStatus, setGmailStatus] = useState<GmailDraftStatus>("idle");
+  const [gmailError, setGmailError] = useState<string | null>(null);
 
   const attendanceTrend = useMemo(() => getAttendanceTrend(row.attendance_history), [row.attendance_history]);
   const attendanceBuckets = useMemo(
@@ -125,29 +109,87 @@ export function MemberDetailPanel({ row }: MemberDetailPanelProps) {
   const recentAttendance = row.attendance_history.slice(0, 6);
   const recommendedAction = row.risk.tier ? tierActionMap[row.risk.tier] : "No action available until scoring runs";
 
-  const onGenerateEmail = () => {
-    setOutreachDraft(buildEmailTemplate(row));
-    setActionStatus("Email template generated.");
-  };
+  const onGenerate = async (type: OutreachType) => {
+    setGenerating(type);
+    setDraft(null);
+    setDraftError(null);
+    setCopied(false);
+    setGmailStatus("idle");
+    setGmailError(null);
 
-  const onGenerateSms = () => {
-    setOutreachDraft(buildSmsTemplate(row));
-    setActionStatus("SMS template generated.");
-  };
+    try {
+      const response = await fetch("/api/outreach/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ member_pco_id: row.member.pco_id, type }),
+      });
 
-  const onGenerateCallScript = () => {
-    setOutreachDraft(buildCallScriptTemplate(row));
-    setActionStatus("Call script generated.");
-  };
+      const result = (await response.json()) as {
+        success: boolean;
+        source?: "openrouter" | "fallback";
+        model?: string | null;
+        type?: OutreachType;
+        subject?: string;
+        body?: string;
+        error?: string;
+      };
 
-  const onCreateGmailDraft = () => {
-    if (!row.member.email) {
-      setActionStatus("No email available for this member.");
-      return;
+      if (!result.success || !result.body) {
+        setDraftError(result.error ?? "Failed to generate draft.");
+      } else if (result.type === "email") {
+        setDraft({ type: "email", subject: result.subject ?? "", body: result.body, source: result.source ?? "fallback", model: result.model ?? null });
+      } else if (result.type === "sms") {
+        setDraft({ type: "sms", body: result.body, source: result.source ?? "fallback", model: result.model ?? null });
+      } else {
+        setDraftError("Unexpected response type from server.");
+      }
+    } catch {
+      setDraftError("Could not reach the generate service. Please try again.");
+    } finally {
+      setGenerating(null);
     }
+  };
 
-    setOutreachDraft(buildEmailTemplate(row));
-    setActionStatus("Mock Gmail draft prepared locally (API not connected).");
+  const onCopy = async () => {
+    if (!draft) return;
+    const text =
+      draft.type === "email" ? `Subject: ${draft.subject}\n\n${draft.body}` : draft.body;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable — silent fail
+    }
+  };
+
+  const onCreateGmailDraft = async () => {
+    if (!draft || draft.type !== "email") return;
+    setGmailStatus("creating");
+    setGmailError(null);
+
+    try {
+      const response = await fetch("/api/gmail/create-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: row.member.email,
+          subject: draft.subject,
+          body: draft.body,
+        }),
+      });
+
+      const result = (await response.json()) as { success: boolean; error?: string };
+      if (!result.success) {
+        setGmailStatus("error");
+        setGmailError(result.error ?? "Failed to create Gmail draft.");
+      } else {
+        setGmailStatus("success");
+      }
+    } catch {
+      setGmailStatus("error");
+      setGmailError("Could not reach the server. Please try again.");
+    }
   };
 
   return (
@@ -352,64 +394,115 @@ export function MemberDetailPanel({ row }: MemberDetailPanelProps) {
           <CardTitle>Generate communication drafts</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Button onClick={onGenerateEmail} className="justify-start gap-2">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Button
+              onClick={() => void onGenerate("email")}
+              disabled={generating !== null}
+              className="justify-start gap-2"
+            >
               <Mail className="size-4" />
-              Generate Email
+              {generating === "email" ? "Generating..." : "Generate Email"}
             </Button>
-            <Button variant="secondary" onClick={onGenerateSms} className="justify-start gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => void onGenerate("sms")}
+              disabled={generating !== null}
+              className="justify-start gap-2"
+            >
               <MessageSquare className="size-4" />
-              Generate SMS
-            </Button>
-            <Button variant="secondary" onClick={onGenerateCallScript} className="justify-start gap-2">
-              <Phone className="size-4" />
-              Generate Call Script
-            </Button>
-            <Button variant="secondary" onClick={onCreateGmailDraft} className="justify-start gap-2">
-              <ClipboardList className="size-4" />
-              Create Gmail Draft
+              {generating === "sms" ? "Generating..." : "Generate SMS"}
             </Button>
           </div>
 
           <div className="rounded-lg border border-border/80 bg-[#F8F2DA] p-4">
-            <p className="mb-2 inline-flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Activity className="size-4 text-primary" />
-              Draft preview
-            </p>
-            {outreachDraft ? (
-              <pre className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{outreachDraft}</pre>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Activity className="size-4 text-primary" />
+                Draft preview
+              </p>
+              {draft ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void onCopy()}
+                  className="gap-1.5"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="size-3" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="size-3" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+              ) : null}
+            </div>
+            {generating ? (
+              <p className="text-sm text-muted-foreground">Generating draft...</p>
+            ) : draft ? (
+              <div className="space-y-2">
+                {draft.type === "email" && draft.subject ? (
+                  <p className="text-sm font-semibold text-foreground">Subject: {draft.subject}</p>
+                ) : null}
+                <pre className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+                  {draft.body}
+                </pre>
+                <p className="text-xs text-muted-foreground/70">
+                  {draft.source === "openrouter"
+                    ? `Generated by OpenRouter · Model: ${draft.model ?? "unknown"}`
+                    : "Generated by Fallback Template"}
+                </p>
+                {draft.type === "email" ? (
+                  <div className="space-y-2 pt-1">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => void onCreateGmailDraft()}
+                      disabled={gmailStatus === "creating" || gmailStatus === "success"}
+                      className="gap-1.5"
+                    >
+                      {gmailStatus === "creating" ? (
+                        <>
+                          <ClipboardList className="size-3" />
+                          Creating draft...
+                        </>
+                      ) : gmailStatus === "success" ? (
+                        <>
+                          <Check className="size-3" />
+                          Draft created in Gmail
+                        </>
+                      ) : (
+                        <>
+                          <ClipboardList className="size-3" />
+                          Create Gmail Draft
+                        </>
+                      )}
+                    </Button>
+                    {gmailStatus === "error" && gmailError ? (
+                      <p className="text-xs text-red-600">{gmailError}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Generate Email, SMS, or Call Script to preview outreach content.
+                Generate Email or SMS to preview outreach content.
               </p>
             )}
           </div>
 
-          {actionStatus ? (
-            <div className="rounded-md border border-border/80 bg-[#EEE5C6] px-3 py-2 text-sm text-foreground">
-              {actionStatus}
+          {draftError ? (
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {draftError}
             </div>
           ) : null}
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <p className="shepherd-kicker">Outreach History</p>
-          <CardTitle>Past communications</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-lg border border-dashed border-border bg-[#F8F2DA] p-6 text-center">
-            <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
-              <CalendarClock className="size-4" />
-              No outreach history yet.
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Outreach activity will appear here once logging is enabled.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
     </motion.div>
   );
 }
