@@ -4,13 +4,15 @@ import type { ComponentType, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import { motion } from "framer-motion";
-import { Cable, CheckCircle2, RefreshCcw, Settings2, Unplug } from "lucide-react";
+import { Cable, CheckCircle2, Mail, RefreshCcw, Settings2, Unplug } from "lucide-react";
 
 import {
+  isGmailConnected,
   isPlanningCenterConnected,
   updateChurchSettings,
   type ChurchSettingsRecord,
   type EditableChurchSettings,
+  type GmailConnection,
   type PlanningCenterConnection,
 } from "@/lib/data";
 import { Button } from "@/components/ui/button";
@@ -34,6 +36,11 @@ type PlanningCenterConnectionPanelProps = SharedPanelProps & {
   churchId: number | null;
   connection: PlanningCenterConnection | null;
   churchName: string;
+};
+
+type GmailConnectionPanelProps = SharedPanelProps & {
+  churchId: number | null;
+  connection: GmailConnection | null;
 };
 
 type SyncStatusPanelProps = SharedPanelProps & {
@@ -157,6 +164,90 @@ export function PlanningCenterConnectionPanel({
         <p className="mt-1 text-muted-foreground">
           {loading ? "Checking connection status..." : `Workspace: ${churchName}`}
         </p>
+      </div>
+      {oauthError ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {oauthError}
+        </div>
+      ) : null}
+    </Panel>
+  );
+}
+
+export function GmailConnectionPanel({ churchId, connection, loading = false }: GmailConnectionPanelProps) {
+  const connected = isGmailConnected(connection);
+  const [startingOAuth, setStartingOAuth] = useState(false);
+  const [oauthError, setOauthError] = useState<string | null>(null);
+
+  const startGmailOAuth = async () => {
+    if (!churchId || !supabase || startingOAuth) return;
+
+    setStartingOAuth(true);
+    setOauthError(null);
+
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (sessionError || !accessToken) {
+        throw new Error("Sign in again before connecting Gmail.");
+      }
+
+      const response = await fetch(`/api/gmail/connect?church_id=${churchId}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const result = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
+
+      if (!response.ok || !result?.url) {
+        throw new Error(result?.error ?? "Could not start Gmail OAuth.");
+      }
+
+      window.location.assign(result.url);
+    } catch (error) {
+      console.error("Failed to start Gmail OAuth", error);
+      setOauthError(error instanceof Error ? error.message : "Could not start Gmail OAuth.");
+    } finally {
+      setStartingOAuth(false);
+    }
+  };
+
+  return (
+    <Panel
+      title="Gmail Connection"
+      description="Authorize Gmail to send outreach drafts directly from Shepherd."
+      icon={Mail}
+      actions={
+        <>
+          <Button onClick={() => void startGmailOAuth()} disabled={!churchId || loading || startingOAuth}>
+            {startingOAuth
+              ? "Opening Google..."
+              : connected
+                ? "Reconnect Gmail"
+                : "Connect Gmail"}
+          </Button>
+        </>
+      }
+    >
+      <div className="rounded-lg border border-border/80 bg-[#F8F2DA] p-3 text-sm">
+        <p className="inline-flex items-center gap-2 font-semibold text-foreground">
+          {connected ? (
+            <CheckCircle2 className="size-4 text-primary" />
+          ) : (
+            <Unplug className="size-4 text-primary" />
+          )}
+          {loading
+            ? "Loading data..."
+            : connected
+              ? "Gmail Connected"
+              : "Gmail not connected"}
+        </p>
+        {!loading && connected && connection?.connected_email ? (
+          <p className="mt-1 text-muted-foreground">{connection.connected_email}</p>
+        ) : null}
+        {!loading && !connected ? (
+          <p className="mt-1 text-muted-foreground">
+            Connect Gmail to create outreach drafts directly in your inbox.
+          </p>
+        ) : null}
       </div>
       {oauthError ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

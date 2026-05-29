@@ -5,6 +5,7 @@ import { Database, HeartHandshake } from "lucide-react";
 
 import {
   ChurchSettingsPanel,
+  GmailConnectionPanel,
   PlanningCenterConnectionPanel,
   SyncStatusPanel,
 } from "@/components/settings-panel";
@@ -12,8 +13,10 @@ import { PageShell } from "@/components/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   getChurchSettings,
+  getGmailConnection,
   getPlanningCenterConnection,
   type ChurchSettingsRecord,
+  type GmailConnection,
   type PlanningCenterConnection,
 } from "@/lib/data";
 import { useAuth } from "@/lib/auth-context";
@@ -24,6 +27,7 @@ export default function SettingsPage() {
   const [churchName, setChurchName] = useState("Unknown Church");
   const [settings, setSettings] = useState<ChurchSettingsRecord | null>(null);
   const [connection, setConnection] = useState<PlanningCenterConnection | null>(null);
+  const [gmailConnection, setGmailConnection] = useState<GmailConnection | null>(null);
 
   const loadSettings = useCallback(async () => {
     setLoading(true);
@@ -36,14 +40,16 @@ export default function SettingsPage() {
       return;
     }
 
-    const [churchSettings, planningCenterConnection] = await Promise.all([
+    const [churchSettings, planningCenterConnection, gmailConn] = await Promise.all([
       getChurchSettings(churchId),
       getPlanningCenterConnection(churchId),
+      getGmailConnection(churchId),
     ]);
 
     setChurchName(activeChurchName ?? churchSettings?.church_name?.trim() ?? "Unknown Church");
     setSettings(churchSettings);
     setConnection(planningCenterConnection);
+    setGmailConnection(gmailConn);
     await refreshWorkspace();
     setLoading(false);
   }, [activeChurchName, churchId, refreshWorkspace]);
@@ -82,6 +88,14 @@ export default function SettingsPage() {
           connection={connection}
           loading={loading}
           onSyncComplete={loadSettings}
+        />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <GmailConnectionPanel
+          churchId={churchId}
+          connection={gmailConnection}
+          loading={loading}
         />
       </section>
 

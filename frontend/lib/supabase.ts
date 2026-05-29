@@ -128,6 +128,7 @@ export type Database = {
           expires_at: string | null;
           scope: string | null;
           connection_status: string | null;
+          connected_email: string | null;
           last_sync_at: string | null;
           members_imported: number | null;
           attendance_imported: number | null;
@@ -143,6 +144,7 @@ export type Database = {
           expires_at?: string | null;
           scope?: string | null;
           connection_status?: string | null;
+          connected_email?: string | null;
           last_sync_at?: string | null;
           members_imported?: number | null;
           attendance_imported?: number | null;
@@ -158,6 +160,7 @@ export type Database = {
           expires_at?: string | null;
           scope?: string | null;
           connection_status?: string | null;
+          connected_email?: string | null;
           last_sync_at?: string | null;
           members_imported?: number | null;
           attendance_imported?: number | null;

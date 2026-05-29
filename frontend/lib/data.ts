@@ -73,6 +73,7 @@ export type EngagementOverview = {
 };
 
 export type PlanningCenterConnection = IntegrationTokenRecord;
+export type GmailConnection = IntegrationTokenRecord;
 
 export type OnboardingWorkspaceInput = {
   church_name: string;
@@ -299,6 +300,34 @@ export async function getPlanningCenterConnection(
   }
 
   return scopedQuery.data?.[0] ?? null;
+}
+
+export async function getGmailConnection(churchId: number): Promise<GmailConnection | null> {
+  const client = requireSupabaseClient();
+
+  const scopedQuery = await client
+    .from("integration_tokens")
+    .select("*")
+    .eq("church_id", churchId)
+    .eq("provider", "gmail")
+    .order("updated_at", { ascending: false })
+    .limit(1);
+
+  if (scopedQuery.error) {
+    logQueryError("integration_tokens (gmail)", scopedQuery.error);
+    throw scopedQuery.error;
+  }
+
+  return scopedQuery.data?.[0] ?? null;
+}
+
+export function isGmailConnected(connection: GmailConnection | null): boolean {
+  return Boolean(
+    connection &&
+      connection.connection_status === "connected" &&
+      connection.provider === "gmail" &&
+      connection.access_token,
+  );
 }
 
 export function isPlanningCenterConnected(connection: PlanningCenterConnection | null): boolean {

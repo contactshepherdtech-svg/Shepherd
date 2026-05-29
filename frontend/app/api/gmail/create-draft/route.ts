@@ -1,50 +1,66 @@
-import fs from "fs";
-import path from "path";
-
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
-// Project root is one level above the Next.js app
-const PROJECT_ROOT = path.resolve(process.cwd(), "..");
-const CREDENTIALS_PATH = path.join(PROJECT_ROOT, "credentials.json");
-const TOKEN_PATH = path.join(PROJECT_ROOT, "gmail_token.json");
-
-type GmailToken = {
-  token: string;
-  refresh_token: string;
-  token_uri: string;
-  client_id: string;
-  client_secret: string;
-  scopes: string[];
-  expiry: string;
-};
-
-type CredentialsFile = {
-  installed: {
-    client_id: string;
-    client_secret: string;
-    token_uri: string;
-  };
-};
-
-function readTokenFile(): GmailToken {
-  if (!fs.existsSync(TOKEN_PATH)) {
-    throw new Error("gmail_token.json not found. Authenticate Gmail in the Python app first.");
-  }
-  return JSON.parse(fs.readFileSync(TOKEN_PATH, "utf-8")) as GmailToken;
+function getServiceRoleClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-function readCredentials(): { clientId: string; clientSecret: string } {
-  if (!fs.existsSync(CREDENTIALS_PATH)) {
-    throw new Error("credentials.json not found.");
-  }
-  const creds = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, "utf-8")) as CredentialsFile;
-  return {
-    clientId: creds.installed.client_id,
-    clientSecret: creds.installed.client_secret,
-  };
+async function resolveChurchId(authorization: string): Promise<number | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return null;
+
+  const userClient = createClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: authorization } },
+  });
+
+  const { data: userData, error: userError } = await userClient.auth.getUser();
+  if (userError || !userData.user) return null;
+
+  const db = getServiceRoleClient();
+  if (!db) return null;
+
+  const { data: churchUsers, error } = await db
+    .from("church_users")
+    .select("church_id")
+    .eq("user_id", userData.user.id)
+    .limit(1);
+
+  if (error || !churchUsers?.length) return null;
+
+  const churchId = (churchUsers[0] as { church_id: number }).church_id;
+  return Number.isInteger(churchId) && churchId > 0 ? churchId : null;
 }
 
-async function refreshAccessToken(token: GmailToken, clientId: string, clientSecret: string): Promise<string> {
+type GmailTokenRow = {
+  id: number;
+  access_token: string | null;
+  refresh_token: string | null;
+  expires_at: string | null;
+  connection_status: string | null;
+};
+
+async function getValidAccessToken(token: GmailTokenRow): Promise<string> {
+  const accessToken = token.access_token;
+  if (!accessToken) throw new Error("No Gmail access token stored.");
+
+  const isExpired =
+    token.expires_at
+      ? new Date(token.expires_at).getTime() - Date.now() < 60_000
+      : false;
+
+  if (!isExpired) return accessToken;
+
+  if (!token.refresh_token) throw new Error("Gmail token expired and no refresh token is stored.");
+
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error("Google OAuth credentials are not configured.");
+
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -61,28 +77,20 @@ async function refreshAccessToken(token: GmailToken, clientId: string, clientSec
     throw new Error(`Token refresh failed: ${response.status} ${text.slice(0, 200)}`);
   }
 
-  const data = (await response.json()) as { access_token: string; expires_in: number };
-  const newExpiry = new Date(Date.now() + data.expires_in * 1000).toISOString();
+  const data = (await response.json()) as { access_token: string; expires_in?: number };
+  const newExpiry = data.expires_in
+    ? new Date(Date.now() + data.expires_in * 1000).toISOString()
+    : null;
 
-  const updated: GmailToken = { ...token, token: data.access_token, expiry: newExpiry };
-  fs.writeFileSync(TOKEN_PATH, JSON.stringify(updated, null, 2), "utf-8");
-
-  return data.access_token;
-}
-
-async function getValidAccessToken(): Promise<string> {
-  const token = readTokenFile();
-  const { clientId, clientSecret } = readCredentials();
-
-  const expiry = new Date(token.expiry);
-  const isExpired = expiry.getTime() - Date.now() < 60_000; // treat as expired if < 1 minute left
-
-  if (isExpired) {
-    console.log("[gmail] Access token expired — refreshing.");
-    return refreshAccessToken(token, clientId, clientSecret);
+  const db = getServiceRoleClient();
+  if (db) {
+    await db
+      .from("integration_tokens")
+      .update({ access_token: data.access_token, expires_at: newExpiry, updated_at: new Date().toISOString() } as never)
+      .eq("id", token.id);
   }
 
-  return token.token;
+  return data.access_token;
 }
 
 function buildRawMessage(to: string, subject: string, body: string): string {
@@ -103,6 +111,44 @@ function buildRawMessage(to: string, subject: string, body: string): string {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const authorization = request.headers.get("authorization");
+  if (!authorization) {
+    return NextResponse.json({ success: false, error: "Authentication is required." }, { status: 401 });
+  }
+
+  const churchId = await resolveChurchId(authorization);
+  if (!churchId) {
+    return NextResponse.json({ success: false, error: "No church workspace found for this user." }, { status: 403 });
+  }
+
+  const db = getServiceRoleClient();
+  if (!db) {
+    return NextResponse.json({ success: false, error: "Server configuration error." }, { status: 500 });
+  }
+
+  const { data: tokens, error: tokenError } = await db
+    .from("integration_tokens")
+    .select("id, access_token, refresh_token, expires_at, connection_status")
+    .eq("church_id", churchId)
+    .eq("provider", "gmail")
+    .limit(1);
+
+  if (tokenError || !tokens?.length) {
+    console.error("[gmail/create-draft] No Gmail token for church_id:", churchId, tokenError);
+    return NextResponse.json(
+      { success: false, error: "Gmail is not connected. Connect Gmail in Settings first." },
+      { status: 400 },
+    );
+  }
+
+  const token = tokens[0] as GmailTokenRow;
+  if (token.connection_status === "disconnected") {
+    return NextResponse.json(
+      { success: false, error: "Gmail is not connected. Connect Gmail in Settings first." },
+      { status: 400 },
+    );
+  }
+
   let to: string | undefined;
   let subject: string | undefined;
   let body: string | undefined;
@@ -125,10 +171,10 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   let accessToken: string;
   try {
-    accessToken = await getValidAccessToken();
+    accessToken = await getValidAccessToken(token);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[gmail] Auth error:", message);
+    console.error("[gmail/create-draft] Auth error:", message);
     return NextResponse.json({ success: false, error: `Gmail auth error: ${message}` }, { status: 500 });
   }
 
@@ -146,19 +192,16 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     if (!response.ok) {
       const text = await response.text().catch(() => "");
-      console.error("[gmail] Draft creation failed:", response.status, text.slice(0, 300));
-      return NextResponse.json(
-        { success: false, error: `Gmail API error ${response.status}.` },
-        { status: 500 },
-      );
+      console.error("[gmail/create-draft] Draft creation failed:", response.status, text.slice(0, 300));
+      return NextResponse.json({ success: false, error: `Gmail API error ${response.status}.` }, { status: 500 });
     }
 
     const draft = (await response.json()) as { id: string };
-    console.log("[gmail] Draft created:", draft.id);
+    console.log("[gmail/create-draft] Draft created for church_id:", churchId, "draft_id:", draft.id);
     return NextResponse.json({ success: true, draftId: draft.id });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[gmail] Fetch error:", message);
+    console.error("[gmail/create-draft] Fetch error:", message);
     return NextResponse.json({ success: false, error: "Could not reach Gmail API." }, { status: 500 });
   }
 }

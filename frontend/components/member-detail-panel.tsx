@@ -19,12 +19,15 @@ import { RiskBadge } from "@/components/risk-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  getGmailConnection,
   getOutreachStatuses,
+  isGmailConnected,
   upsertOutreachStatus,
   type MemberDirectoryRow,
   type OutreachStatusRecord,
 } from "@/lib/data";
 import { formatDate, formatRelativeDays } from "@/lib/format";
+import { supabase } from "@/lib/supabase";
 
 type OutreachType = "email" | "sms";
 
@@ -110,12 +113,13 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
   const [copied, setCopied] = useState(false);
   const [gmailStatus, setGmailStatus] = useState<GmailDraftStatus>("idle");
   const [gmailError, setGmailError] = useState<string | null>(null);
+  const [gmailConnected, setGmailConnected] = useState<boolean | null>(null);
   const [outreachStatus, setOutreachStatus] = useState<OutreachStatusRecord | null>(null);
   const [outreachActionState, setOutreachActionState] = useState<OutreachActionState>("idle");
   const [outreachMessage, setOutreachMessage] = useState<string | null>(null);
   const [outreachError, setOutreachError] = useState<string | null>(null);
 
-  // Load outreach status whenever the displayed member changes
+  // Load outreach status and Gmail connection whenever churchId changes
   useEffect(() => {
     setOutreachStatus(null);
     setOutreachActionState("idle");
@@ -132,6 +136,16 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
 
     return () => { active = false; };
   }, [churchId, row.member.pco_id]);
+
+  useEffect(() => {
+    if (!churchId) return;
+    let active = true;
+    void getGmailConnection(churchId).then((conn) => {
+      if (!active) return;
+      setGmailConnected(isGmailConnected(conn));
+    });
+    return () => { active = false; };
+  }, [churchId]);
 
   // Auto-trigger email generation when navigated from "Draft Email" button
   useEffect(() => {
@@ -258,9 +272,16 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
     setGmailError(null);
 
     try {
+      const accessToken = supabase
+        ? (await supabase.auth.getSession()).data.session?.access_token
+        : null;
+
       const response = await fetch("/api/gmail/create-draft", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({
           to: row.member.email,
           subject: draft.subject,
@@ -619,30 +640,36 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
                 </p>
                 {draft.type === "email" ? (
                   <div className="space-y-2 pt-1">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => void onCreateGmailDraft()}
-                      disabled={gmailStatus === "creating" || gmailStatus === "success"}
-                      className="gap-1.5"
-                    >
-                      {gmailStatus === "creating" ? (
-                        <>
-                          <ClipboardList className="size-3" />
-                          Creating draft...
-                        </>
-                      ) : gmailStatus === "success" ? (
-                        <>
-                          <Check className="size-3" />
-                          Draft created in Gmail
-                        </>
-                      ) : (
-                        <>
-                          <ClipboardList className="size-3" />
-                          Create Gmail Draft
-                        </>
-                      )}
-                    </Button>
+                    {gmailConnected === false ? (
+                      <p className="text-xs text-muted-foreground">
+                        Connect Gmail in Settings first.
+                      </p>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => void onCreateGmailDraft()}
+                        disabled={gmailConnected !== true || gmailStatus === "creating" || gmailStatus === "success"}
+                        className="gap-1.5"
+                      >
+                        {gmailStatus === "creating" ? (
+                          <>
+                            <ClipboardList className="size-3" />
+                            Creating draft...
+                          </>
+                        ) : gmailStatus === "success" ? (
+                          <>
+                            <Check className="size-3" />
+                            Draft created in Gmail
+                          </>
+                        ) : (
+                          <>
+                            <ClipboardList className="size-3" />
+                            Create Gmail Draft
+                          </>
+                        )}
+                      </Button>
+                    )}
                     {gmailStatus === "error" && gmailError ? (
                       <p className="text-xs text-red-600">{gmailError}</p>
                     ) : null}
