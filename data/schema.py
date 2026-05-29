@@ -2,7 +2,7 @@ import os
 import logging
 from datetime import datetime
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, inspect, text
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, UniqueConstraint, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 logger = logging.getLogger(__name__)
@@ -49,10 +49,11 @@ class Church(Base):
 
 class Member(Base):
     __tablename__ = "members"
+    __table_args__ = (UniqueConstraint("church_id", "pco_id", name="uq_members_church_pco_id"),)
 
     id = Column(Integer, primary_key=True, index=True)
     church_id = Column(Integer, index=True)
-    pco_id = Column(String, unique=True, index=True)
+    pco_id = Column(String, index=True)
     name = Column(String)
     email = Column(String)
     status = Column(String)
@@ -62,10 +63,11 @@ class Member(Base):
 
 class Attendance(Base):
     __tablename__ = "attendance"
+    __table_args__ = (UniqueConstraint("church_id", "pco_checkin_id", name="uq_attendance_church_pco_checkin"),)
 
     id = Column(Integer, primary_key=True, index=True)
     church_id = Column(Integer, index=True)
-    pco_checkin_id = Column(String, unique=True, index=True)
+    pco_checkin_id = Column(String, index=True)
     member_pco_id = Column(String, index=True)
     attended_at = Column(DateTime)
     source = Column(String)
@@ -107,10 +109,11 @@ class ChurchSettings(Base):
 
 class IntegrationToken(Base):
     __tablename__ = "integration_tokens"
+    __table_args__ = (UniqueConstraint("church_id", "provider", name="uq_integration_tokens_church_provider"),)
 
     id = Column(Integer, primary_key=True, index=True)
     church_id = Column(Integer, index=True)
-    provider = Column(String, unique=True, index=True)
+    provider = Column(String, index=True)
     access_token = Column(String)
     refresh_token = Column(String)
     expires_at = Column(DateTime)
