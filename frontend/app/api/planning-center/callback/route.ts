@@ -60,7 +60,7 @@ function verifyState(state: string | null, secret: string): PlanningCenterState 
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
@@ -173,10 +173,10 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   const db = getSupabase();
   if (!db) {
-    console.error("[planning-center/callback] Supabase not configured.");
+    console.error("[planning-center/callback] Supabase service role not configured.");
     return errorPage(
       "Server Configuration Error",
-      "Database connection is not configured. Contact your administrator.",
+      "Database service credentials are not configured. Contact your administrator.",
       500,
     );
   }

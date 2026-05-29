@@ -2,14 +2,11 @@ import type { Database } from "@/lib/supabase";
 import { supabase } from "@/lib/supabase";
 
 type ChurchRow = Database["public"]["Tables"]["churches"]["Row"];
-type ChurchInsert = Database["public"]["Tables"]["churches"]["Insert"];
 type ChurchUserRow = Database["public"]["Tables"]["church_users"]["Row"];
-type ChurchUserInsert = Database["public"]["Tables"]["church_users"]["Insert"];
 type MemberRow = Database["public"]["Tables"]["members"]["Row"];
 type AttendanceRow = Database["public"]["Tables"]["attendance"]["Row"];
 type RiskScoreRow = Database["public"]["Tables"]["risk_scores"]["Row"];
 type ChurchSettingsRow = Database["public"]["Tables"]["church_settings"]["Row"];
-type ChurchSettingsInsert = Database["public"]["Tables"]["church_settings"]["Insert"];
 type ChurchSettingsUpdate = Database["public"]["Tables"]["church_settings"]["Update"];
 type IntegrationTokenRow = Database["public"]["Tables"]["integration_tokens"]["Row"];
 type OutreachStatusRow = Database["public"]["Tables"]["outreach_status"]["Row"];
@@ -182,79 +179,6 @@ export async function getChurchForUser(
   if (!church) return null;
 
   return { churchUser, church };
-}
-
-export async function createChurchWorkspace(
-  userId: string,
-  values: OnboardingWorkspaceInput,
-): Promise<{ church: ChurchRow; churchUser: ChurchUserRow; settings: ChurchSettingsRow }> {
-  const client = requireSupabaseClient();
-  const now = new Date().toISOString();
-  const churchName = values.church_name.trim();
-
-  const churchPayload: ChurchInsert = {
-    name: churchName,
-    created_at: now,
-    updated_at: now,
-  };
-
-  const { data: churchData, error: churchError } = await client
-    .from("churches")
-    .insert([churchPayload] as never[])
-    .select("*")
-    .single();
-
-  if (churchError) {
-    logQueryError("churches", churchError);
-    throw churchError;
-  }
-
-  const church = churchData as ChurchRow;
-  const settingsPayload: ChurchSettingsInsert = {
-    church_id: church.id,
-    church_name: churchName,
-    main_service_frequency: values.main_service_frequency,
-    watch_missed_services: values.watch_missed_services,
-    at_risk_missed_services: values.at_risk_missed_services,
-    critical_missed_services: values.critical_missed_services,
-    preferred_followup_style: values.preferred_followup_style,
-    created_at: now,
-    updated_at: now,
-  };
-
-  const { data: settingsData, error: settingsError } = await client
-    .from("church_settings")
-    .insert(settingsPayload as never)
-    .select("*")
-    .single();
-
-  if (settingsError) {
-    logQueryError("church_settings", settingsError);
-    throw settingsError;
-  }
-
-  const settings = settingsData as ChurchSettingsRow;
-  const churchUserPayload: ChurchUserInsert = {
-    user_id: userId,
-    church_id: church.id,
-    role: "admin",
-    created_at: now,
-  };
-
-  const { data: churchUserData, error: churchUserError } = await client
-    .from("church_users")
-    .insert(churchUserPayload as never)
-    .select("*")
-    .single();
-
-  if (churchUserError) {
-    logQueryError("church_users", churchUserError);
-    throw churchUserError;
-  }
-
-  const churchUser = churchUserData as ChurchUserRow;
-
-  return { church, churchUser, settings };
 }
 
 export async function getMembers(churchId: number): Promise<MemberRow[]> {

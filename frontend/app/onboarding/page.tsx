@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
-import { createChurchWorkspace, type OnboardingWorkspaceInput } from "@/lib/data";
+import type { OnboardingWorkspaceInput } from "@/lib/data";
+import { supabase } from "@/lib/supabase";
 
 const DEFAULT_FORM: OnboardingWorkspaceInput = {
   church_name: "",
@@ -64,19 +65,46 @@ function OnboardingContent() {
     setError(null);
 
     try {
-      await createChurchWorkspace(user.id, {
-        ...form,
-        church_name: churchName,
-        watch_missed_services: Math.max(Number(form.watch_missed_services), 0),
-        at_risk_missed_services: Math.max(Number(form.at_risk_missed_services), 0),
-        critical_missed_services: Math.max(Number(form.critical_missed_services), 0),
-        preferred_followup_style: form.preferred_followup_style.trim() || "soft and friendly",
+      if (!supabase) {
+        throw new Error("Supabase is not configured.");
+      }
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (sessionError || !accessToken) {
+        throw new Error("Sign in again before creating your workspace.");
+      }
+
+      const response = await fetch("/api/onboarding/create-workspace", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...form,
+          church_name: churchName,
+          watch_missed_services: Math.max(Number(form.watch_missed_services), 0),
+          at_risk_missed_services: Math.max(Number(form.at_risk_missed_services), 0),
+          critical_missed_services: Math.max(Number(form.critical_missed_services), 0),
+          preferred_followup_style: form.preferred_followup_style.trim() || "soft and friendly",
+        }),
       });
+      const result = (await response.json().catch(() => null)) as { success?: boolean; error?: string } | null;
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "Could not create your workspace.");
+      }
+
       await refreshWorkspace();
       router.replace("/settings");
     } catch (workspaceError) {
       console.error("Failed to create church workspace", workspaceError);
-      setError("Could not create your workspace. Check Supabase permissions and try again.");
+      setError(
+        workspaceError instanceof Error
+          ? workspaceError.message
+          : "Could not create your workspace. Check Supabase permissions and try again.",
+      );
     } finally {
       setSaving(false);
     }
