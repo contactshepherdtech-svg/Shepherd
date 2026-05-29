@@ -1517,6 +1517,142 @@ def build_member_timeline_items(selected_row):
     ]
 
 
+def get_member_attendance_history(selected_row):
+    attendance_history = []
+    for attended_at in selected_row.get("Attendance history", []):
+        if isinstance(attended_at, datetime):
+            attendance_history.append(attended_at)
+    return sorted(attendance_history, reverse=True)
+
+
+def build_member_attendance_90_day_rows(attendance_history):
+    now = datetime.utcnow()
+    current_week_start = (now - timedelta(days=now.weekday())).replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+    first_week_start = current_week_start - timedelta(weeks=12)
+    cutoff = now - timedelta(days=90)
+
+    weekly_counts = {}
+    for offset in range(13):
+        week_start = first_week_start + timedelta(weeks=offset)
+        weekly_counts[week_start] = 0
+
+    for attended_at in attendance_history:
+        if attended_at < cutoff:
+            continue
+        week_start = (attended_at - timedelta(days=attended_at.weekday())).replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        if week_start in weekly_counts:
+            weekly_counts[week_start] += 1
+
+    rows = []
+    for week_start in sorted(weekly_counts):
+        records = weekly_counts[week_start]
+        rows.append(
+            {
+                "label": week_start.strftime("%b %d"),
+                "records": records,
+                "unique_members": 1 if records else 0,
+            }
+        )
+    return rows
+
+
+def get_member_attendance_trend_label(attendance_history):
+    now = datetime.utcnow()
+    recent_start = now - timedelta(days=45)
+    previous_start = now - timedelta(days=90)
+
+    current_window_count = 0
+    previous_window_count = 0
+    for attended_at in attendance_history:
+        if attended_at >= recent_start:
+            current_window_count += 1
+        elif previous_start <= attended_at < recent_start:
+            previous_window_count += 1
+
+    if current_window_count == 0 and previous_window_count == 0:
+        return "No recent activity"
+    if current_window_count > previous_window_count:
+        return "Improving"
+    if current_window_count < previous_window_count:
+        return "Declining"
+    return "Stable"
+
+
+def get_days_since_last_attendance(last_attended):
+    if not isinstance(last_attended, datetime):
+        return None
+    return max((datetime.utcnow() - last_attended).days, 0)
+
+
+def get_recommended_action_for_tier(tier):
+    action_map = {
+        "Healthy": "No action needed",
+        "Watch": "Friendly check-in",
+        "At Risk": "Personal email or call",
+        "Critical": "Pastor or ministry leader follow-up",
+    }
+    return action_map.get(tier, "Friendly check-in")
+
+
+def build_risk_plain_english_explanation(tier, reasons):
+    reason_text = str(reasons or "").strip()
+    tier_explanation = {
+        "Healthy": "This member is showing steady engagement patterns and currently has low disengagement risk.",
+        "Watch": "This member is showing early signs of reduced engagement and may benefit from a light personal touchpoint.",
+        "At Risk": "This member has noticeable disengagement signals and should receive timely follow-up from the team.",
+        "Critical": "This member has sustained disengagement indicators and likely needs direct leadership outreach soon.",
+    }.get(
+        tier,
+        "This member has engagement signals that should be reviewed by your team.",
+    )
+    if not reason_text:
+        return tier_explanation
+    if reason_text.lower() == "no reasons available":
+        return tier_explanation
+    return f"{tier_explanation} Primary signals: {reason_text}."
+
+
+def build_sms_template(selected_row, attendance_trend_label, days_since_last_attendance):
+    name = selected_row.get("Member name") or "there"
+    last_attended_copy = (
+        f"{days_since_last_attendance} days ago"
+        if isinstance(days_since_last_attendance, int)
+        else "a while ago"
+    )
+    return (
+        f"Hi {name}, this is Shepherd checking in. "
+        f"We missed seeing you recently (last attendance was {last_attended_copy}). "
+        f"Your recent trend is {attendance_trend_label.lower()}. "
+        "How are you doing, and is there any way we can support you this week?"
+    )
+
+
+def build_call_script_template(selected_row, attendance_trend_label, days_since_last_attendance):
+    name = selected_row.get("Member name") or "this member"
+    last_attended_copy = (
+        f"{days_since_last_attendance} days ago"
+        if isinstance(days_since_last_attendance, int)
+        else "some time ago"
+    )
+    return (
+        f"Hi {name}, this is [Your Name] from church. I wanted to check in personally.\n\n"
+        f"We noticed attendance has shifted recently (last attended {last_attended_copy}; trend is {attendance_trend_label.lower()}).\n"
+        "How are you doing spiritually and practically right now?\n\n"
+        "Is there anything we can pray for or help with this week?\n\n"
+        "Thank you for sharing. We care about you and want to stay connected."
+    )
+
+
 def render_message_preview(message):
     escaped_message = html_escape(message or "").replace("\n", "<br>")
     render_html_block(f"<div class='message-preview'>{escaped_message}</div>")
@@ -1526,10 +1662,20 @@ def render_member_detail_panel(selected_row):
     selected_member = selected_row["member"]
     selected_risk = selected_row["risk"]
     selected_member_id = selected_row["member_pco_id"]
+    attendance_history = get_member_attendance_history(selected_row)
+    attendance_trend_rows = build_member_attendance_90_day_rows(attendance_history)
+    attendance_trend_label = get_member_attendance_trend_label(attendance_history)
+    days_since_last_attendance = get_days_since_last_attendance(selected_row["Last attended"])
+    recommended_action = get_recommended_action_for_tier(selected_row["Tier"])
+    risk_explanation = build_risk_plain_english_explanation(
+        selected_row["Tier"],
+        selected_row["Reasons"],
+    )
+    recent_attendance_dates = attendance_history[:8]
 
     render_html_block(
         f"""
-        <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;margin-bottom:1rem;">
+        <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;margin-bottom:0.85rem;">
             <div>
                 <div style="font-family:'Plus Jakarta Sans', Inter, sans-serif;font-size:1.55rem;font-weight:700;line-height:1.08;color:#1D2B24;">
                     {html_escape(selected_row['Member name'] or 'Unknown member')}
@@ -1539,109 +1685,245 @@ def render_member_detail_panel(selected_row):
                 </div>
             </div>
             <div style="display:flex;gap:0.45rem;flex-wrap:wrap;justify-content:flex-end;">
+                {build_inline_badge(f"Risk {selected_row['Risk score']}", tone='critical' if selected_row['Tier'] in ['At Risk', 'Critical'] else 'watch', icon_name='alert')}
                 {build_tier_badge(selected_row['Tier'])}
                 {build_inline_badge(selected_row['Status'] or 'Unknown', tone='neutral')}
-                {build_inline_badge(f"{selected_row['Attendance count']} attendance", tone='accent', icon_name='activity')}
+                {build_inline_badge(f"Last attended {selected_row['Last attended display']}", tone='accent', icon_name='clock')}
             </div>
         </div>
         """
     )
 
-    risk_score = int(selected_row["Risk score"] or 0)
-    engagement_score = max(0, 100 - risk_score)
+    with st.container(border=True):
+        render_surface_header(
+            "Risk analysis",
+            "Why this member is in the current risk tier and what it means operationally.",
+            eyebrow="Member 360",
+        )
+        metrics_col1, metrics_col2, metrics_col3 = st.columns(3, gap="medium")
+        with metrics_col1:
+            render_metric_card(
+                "Risk score",
+                selected_row["Risk score"],
+                "0 is healthiest, 100 is most urgent",
+                tone="critical" if selected_row["Tier"] in ("At Risk", "Critical") else "watch",
+                icon_name="alert",
+            )
+        with metrics_col2:
+            render_metric_card(
+                "Risk tier",
+                selected_row["Tier"],
+                f"Status: {selected_row['Status'] or 'Unknown'}",
+                tone="critical" if selected_row["Tier"] == "Critical" else ("at-risk" if selected_row["Tier"] == "At Risk" else "healthy"),
+                icon_name="shield",
+            )
+        with metrics_col3:
+            render_metric_card(
+                "Last attended",
+                selected_row["Last attended display"] if selected_row["Last attended"] else "No attendance yet",
+                f"{selected_row['Attendance count']} attendance records",
+                tone="accent",
+                icon_name="clock",
+            )
 
-    gauge_col1, gauge_col2, gauge_col3 = st.columns([1, 1, 0.9], gap="medium")
-    with gauge_col1:
+        render_html_block("<div style='height:0.5rem;'></div>")
+        render_html_block(
+            f"""
+            <div class="queue-item-recommendation" style="margin-bottom:0.6rem;">
+                <div class="queue-item-recommendation-label">Risk reasons</div>
+                <div>{html_escape(selected_row['Reasons'] or 'No reasons available')}</div>
+            </div>
+            <div class="queue-item-recommendation">
+                <div class="queue-item-recommendation-label">Plain-English explanation</div>
+                <div>{html_escape(risk_explanation)}</div>
+            </div>
+            """
+        )
+
+    render_html_block("<div style='height:0.55rem;'></div>")
+
+    with st.container(border=True):
+        render_surface_header(
+            "Attendance timeline",
+            "Attendance activity over the last 90 days, plus most recent attendance dates.",
+            eyebrow="Engagement activity",
+        )
+        attendance_metrics_col1, attendance_metrics_col2 = st.columns(2, gap="medium")
+        with attendance_metrics_col1:
+            render_metric_card(
+                "Total attendance",
+                selected_row["Attendance count"],
+                "All recorded attendance events",
+                tone="accent",
+                icon_name="activity",
+            )
+        with attendance_metrics_col2:
+            render_metric_card(
+                "Last attended",
+                selected_row["Last attended display"] if selected_row["Last attended"] else "No attendance yet",
+                "Most recent attendance record",
+                tone="healthy" if selected_row["Last attended"] else "neutral",
+                icon_name="clock",
+            )
+
         st.plotly_chart(
-            make_gauge_chart(risk_score, title="RISK", footer="Lower is healthier"),
+            make_attendance_trend_chart(attendance_trend_rows),
             config=PLOTLY_CHART_CONFIG,
-        )
-    with gauge_col2:
-        st.plotly_chart(
-            make_gauge_chart(
-                engagement_score,
-                title="ENGAGEMENT",
-                reverse=True,
-                footer="Inverse of current risk",
-            ),
-            config=PLOTLY_CHART_CONFIG,
-        )
-    with gauge_col3:
-        render_metric_card(
-            "Last attended",
-            selected_row["Last attended display"] if selected_row["Last attended"] else "—",
-            f"{selected_row['Attendance count']} total attendance records",
-            tone="accent",
-            icon_name="clock",
+            width="stretch",
         )
 
-    render_html_block("<div style='height:0.65rem;'></div>")
-
-    summary_col, timeline_col = st.columns([1.05, 0.95], gap="large")
-    with summary_col:
-        with st.container(border=True):
-            render_surface_header(
-                "Member summary",
-                "The highest-signal reasons behind this member’s current risk posture.",
-                eyebrow="Context",
+        if recent_attendance_dates:
+            recent_date_badges = "".join(
+                build_inline_badge(format_display_date(attended_at), tone="neutral", icon_name="activity")
+                for attended_at in recent_attendance_dates
             )
             render_html_block(
                 f"""
-                <div class="queue-item-recommendation" style="margin-bottom:0.8rem;">
-                    <div class="queue-item-recommendation-label">Risk factors</div>
-                    <div>{html_escape(selected_row['Reasons'])}</div>
+                <div style="margin-top:0.25rem;">
+                    <div class="queue-item-recommendation-label" style="margin-bottom:0.42rem;">Recent attendance dates</div>
+                    <div style="display:flex;gap:0.38rem;flex-wrap:wrap;">{recent_date_badges}</div>
+                </div>
+                """
+            )
+        else:
+            render_html_block(
+                build_empty_state(
+                    "activity",
+                    "No attendance records in the last 90 days.",
+                    "Attendance dates will appear automatically after Planning Center syncs.",
+                )
+            )
+
+    render_html_block("<div style='height:0.55rem;'></div>")
+
+    engagement_summary_col, recommendation_col = st.columns([1, 1], gap="large")
+    with engagement_summary_col:
+        with st.container(border=True):
+            render_surface_header(
+                "Engagement summary",
+                "Current attendance momentum signal for this member.",
+                eyebrow="Health signal",
+            )
+            render_html_block(
+                build_key_value_card(
+                    [
+                        ("Attendance count", selected_row["Attendance count"]),
+                        (
+                            "Days since last attendance",
+                            days_since_last_attendance if days_since_last_attendance is not None else "No attendance history",
+                        ),
+                        ("Attendance trend", attendance_trend_label),
+                    ],
+                    compact=True,
+                )
+            )
+
+    with recommendation_col:
+        with st.container(border=True):
+            render_surface_header(
+                "Recommended action",
+                "A clear next-step suggestion based on current risk tier.",
+                eyebrow="Action guidance",
+            )
+            render_html_block(
+                f"""
+                <div class="queue-item-recommendation" style="margin-bottom:0.65rem;">
+                    <div class="queue-item-recommendation-label">Tier-based recommendation</div>
+                    <div>{html_escape(recommended_action)}</div>
                 </div>
                 <div class="queue-item-recommendation">
-                    <div class="queue-item-recommendation-label">Recommended next step</div>
+                    <div class="queue-item-recommendation-label">Generated suggestion</div>
                     <div>{html_escape(selected_row['Recommendation'])}</div>
                 </div>
                 """
             )
 
-    with timeline_col:
-        with st.container(border=True):
-            render_surface_header(
-                "Activity timeline",
-                "Recent attendance and scoring events for this member.",
-                eyebrow="Timeline",
-            )
-            render_html_block(build_recent_change_items(build_member_timeline_items(selected_row)))
+    render_html_block("<div style='height:0.55rem;'></div>")
 
-    render_html_block("<div style='height:0.65rem;'></div>")
+    with st.container(border=True):
+        render_surface_header(
+            "Outreach actions",
+            "Generate practical follow-up content without changing your existing integrations.",
+            eyebrow="Communication",
+        )
+        action_row1_col1, action_row1_col2 = st.columns(2, gap="medium")
+        action_row2_col1, action_row2_col2 = st.columns(2, gap="medium")
 
-    action_col1, action_col2 = st.columns(2, gap="medium")
-    with action_col1:
-        if st.button(
-            "Generate outreach message",
-            key=f"detail_generate_{selected_member_id}",
-            width="stretch",
-        ):
-            message = generate_outreach_message(selected_member, selected_risk)
-            set_outreach_message(selected_member_id, message)
+        with action_row1_col1:
+            if st.button(
+                "Generate Email",
+                key=f"member360_generate_email_{selected_member_id}",
+                width="stretch",
+                type="primary",
+            ):
+                email_message = generate_outreach_message(selected_member, selected_risk)
+                set_outreach_message(selected_member_id, email_message)
 
-    with action_col2:
-        if st.button(
-            "Create Gmail draft",
-            key=f"detail_draft_{selected_member_id}",
-            width="stretch",
-        ):
-            if not selected_row["Email"]:
-                st.warning("No email available for this member.")
-            else:
-                message = generate_outreach_message(selected_member, selected_risk)
-                set_outreach_message(selected_member_id, message)
-                subject = f"Checking in from Shepherd - {selected_row['Member name']}"
-                try:
-                    draft = create_gmail_draft(selected_row["Email"], subject, message)
-                    st.success(
-                        f"Gmail draft created for {selected_row['Email']} (Draft ID: {draft.get('id')})."
-                    )
-                except Exception as error:
-                    st.error(f"Failed to create Gmail draft: {error}")
+        with action_row1_col2:
+            if st.button(
+                "Generate SMS",
+                key=f"member360_generate_sms_{selected_member_id}",
+                width="stretch",
+            ):
+                sms_template = build_sms_template(
+                    selected_row,
+                    attendance_trend_label,
+                    days_since_last_attendance,
+                )
+                set_outreach_message(selected_member_id, sms_template)
+
+        with action_row2_col1:
+            if st.button(
+                "Generate Call Script",
+                key=f"member360_generate_call_script_{selected_member_id}",
+                width="stretch",
+            ):
+                call_script = build_call_script_template(
+                    selected_row,
+                    attendance_trend_label,
+                    days_since_last_attendance,
+                )
+                set_outreach_message(selected_member_id, call_script)
+
+        with action_row2_col2:
+            if st.button(
+                "Create Gmail Draft",
+                key=f"member360_create_draft_{selected_member_id}",
+                width="stretch",
+            ):
+                if not selected_row["Email"]:
+                    st.warning("No email available for this member.")
+                else:
+                    email_message = generate_outreach_message(selected_member, selected_risk)
+                    set_outreach_message(selected_member_id, email_message)
+                    subject = f"Checking in from Shepherd - {selected_row['Member name']}"
+                    try:
+                        draft = create_gmail_draft(selected_row["Email"], subject, email_message)
+                        st.success(
+                            f"Gmail draft created for {selected_row['Email']} (Draft ID: {draft.get('id')})."
+                        )
+                    except Exception as error:
+                        st.error(f"Failed to create Gmail draft: {error}")
 
     outreach_message = get_outreach_message(selected_member_id)
     if outreach_message:
         render_message_preview(outreach_message)
+
+    render_html_block("<div style='height:0.5rem;'></div>")
+
+    with st.container(border=True):
+        render_surface_header(
+            "Outreach history",
+            "Previous outreach touchpoints will appear here as this workspace matures.",
+            eyebrow="History",
+        )
+        render_html_block(
+            build_empty_state(
+                "mail",
+                "No outreach history yet.",
+                "Generated drafts and logged outreach activity will appear here in a future update.",
+            )
+        )
 
 
 def render_members_page(member_rows):
