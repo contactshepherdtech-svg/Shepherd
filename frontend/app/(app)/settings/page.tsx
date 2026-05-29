@@ -20,6 +20,7 @@ import {
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
+  const [churchId, setChurchId] = useState<number | null>(null);
   const [churchName, setChurchName] = useState("Unknown Church");
   const [settings, setSettings] = useState<ChurchSettingsRecord | null>(null);
   const [connection, setConnection] = useState<PlanningCenterConnection | null>(null);
@@ -33,6 +34,7 @@ export default function SettingsPage() {
       const church = await getDefaultChurch();
       if (!church) {
         if (active) {
+          setChurchId(null);
           setChurchName("Unknown Church");
           setSettings(null);
           setConnection(null);
@@ -47,6 +49,7 @@ export default function SettingsPage() {
       ]);
 
       if (active) {
+        setChurchId(church.id);
         setChurchName(church.name?.trim() || "Unknown Church");
         setSettings(churchSettings);
         setConnection(planningCenterConnection);
@@ -69,7 +72,13 @@ export default function SettingsPage() {
       </section>
 
       <section>
-        <ChurchSettingsPanel settings={settings} loading={loading} />
+        <ChurchSettingsPanel
+          churchId={churchId}
+          churchName={churchName}
+          settings={settings}
+          loading={loading}
+          onSettingsSaved={setSettings}
+        />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">

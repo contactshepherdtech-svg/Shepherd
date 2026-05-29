@@ -65,6 +65,43 @@ export type Database = {
           created_at: string | null;
           updated_at: string | null;
         };
+        Insert: {
+          id?: number;
+          church_id?: number | null;
+          church_name?: string | null;
+          main_service_frequency?: string | null;
+          watch_missed_services?: number | null;
+          at_risk_missed_services?: number | null;
+          critical_missed_services?: number | null;
+          small_groups_enabled?: boolean | null;
+          small_group_frequency?: string | null;
+          volunteer_tracking_enabled?: boolean | null;
+          volunteer_importance?: string | null;
+          giving_enabled?: boolean | null;
+          email_engagement_enabled?: boolean | null;
+          preferred_followup_style?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          church_id?: number | null;
+          church_name?: string | null;
+          main_service_frequency?: string | null;
+          watch_missed_services?: number | null;
+          at_risk_missed_services?: number | null;
+          critical_missed_services?: number | null;
+          small_groups_enabled?: boolean | null;
+          small_group_frequency?: string | null;
+          volunteer_tracking_enabled?: boolean | null;
+          volunteer_importance?: string | null;
+          giving_enabled?: boolean | null;
+          email_engagement_enabled?: boolean | null;
+          preferred_followup_style?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
       };
       integration_tokens: {
         Row: {

@@ -6,6 +6,7 @@ type MemberRow = Database["public"]["Tables"]["members"]["Row"];
 type AttendanceRow = Database["public"]["Tables"]["attendance"]["Row"];
 type RiskScoreRow = Database["public"]["Tables"]["risk_scores"]["Row"];
 type ChurchSettingsRow = Database["public"]["Tables"]["church_settings"]["Row"];
+type ChurchSettingsUpdate = Database["public"]["Tables"]["church_settings"]["Update"];
 type IntegrationTokenRow = Database["public"]["Tables"]["integration_tokens"]["Row"];
 
 export type ChurchRecord = ChurchRow;
@@ -13,6 +14,15 @@ export type MemberRecord = MemberRow;
 export type AttendanceRecord = AttendanceRow;
 export type RiskScoreRecord = RiskScoreRow;
 export type ChurchSettingsRecord = ChurchSettingsRow;
+export type EditableChurchSettings = Pick<
+  ChurchSettingsRow,
+  | "church_name"
+  | "main_service_frequency"
+  | "watch_missed_services"
+  | "at_risk_missed_services"
+  | "critical_missed_services"
+  | "preferred_followup_style"
+>;
 export type IntegrationTokenRecord = IntegrationTokenRow;
 
 export type RiskTier = "Healthy" | "Watch" | "At Risk" | "Critical";
@@ -204,6 +214,36 @@ export async function getChurchSettings(churchId: number): Promise<ChurchSetting
   }
 
   return scopedQuery.data?.[0] ?? null;
+}
+
+export async function updateChurchSettings(
+  churchId: number,
+  values: EditableChurchSettings,
+): Promise<ChurchSettingsRow> {
+  const client = requireSupabaseClient();
+  const payload: ChurchSettingsUpdate = {
+    church_name: values.church_name,
+    main_service_frequency: values.main_service_frequency,
+    watch_missed_services: values.watch_missed_services,
+    at_risk_missed_services: values.at_risk_missed_services,
+    critical_missed_services: values.critical_missed_services,
+    preferred_followup_style: values.preferred_followup_style,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await client
+    .from("church_settings")
+    .update(payload as never)
+    .eq("church_id", churchId)
+    .select("*")
+    .single();
+
+  if (error) {
+    logQueryError("church_settings", error);
+    throw error;
+  }
+
+  return data;
 }
 
 export async function getPlanningCenterConnection(
