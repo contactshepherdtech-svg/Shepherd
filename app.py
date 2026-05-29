@@ -164,10 +164,22 @@ def get_planning_center_integration_summary(church_id=None):
                 "attendance_imported": 0,
             }
 
+        raw_status = str(token.connection_status or "").strip().lower()
+        has_access_token = bool(token.access_token)
+
+        if has_access_token and raw_status == "connected":
+            resolved_status = "Connected"
+        elif raw_status == "error":
+            resolved_status = "Error"
+        elif has_access_token:
+            resolved_status = "Connected"
+        else:
+            resolved_status = "Disconnected"
+
         summary = {
             "provider": "Planning Center",
-            "status": (token.connection_status or "connected").title(),
-            "connected": bool(token.access_token),
+            "status": resolved_status,
+            "connected": bool(has_access_token and resolved_status == "Connected"),
             "last_sync_at": token.last_sync_at,
             "members_imported": int(token.members_imported or 0),
             "attendance_imported": int(token.attendance_imported or 0),
@@ -215,6 +227,20 @@ def update_planning_center_sync_summary(sync_counts=None, church_id=None):
         db.commit()
     finally:
         db.close()
+
+
+def build_planning_center_status_badge(summary=None):
+    integration_summary = summary or get_planning_center_integration_summary()
+    status_value = str(integration_summary.get("status") or "").strip().lower()
+    sync_running = bool(st.session_state.get("planning_center_sync_running", False))
+
+    if sync_running:
+        return build_inline_badge("Connecting", tone="watch", icon_name="refresh")
+    if integration_summary.get("connected") and status_value == "connected":
+        return build_inline_badge("Connected", tone="healthy", icon_name="check")
+    if status_value == "error":
+        return build_inline_badge("Error", tone="critical", icon_name="alert")
+    return build_inline_badge("Disconnected", tone="neutral", icon_name="clock")
 
 
 def build_dashboard_insights(metrics, member_rows, settings):
@@ -530,6 +556,33 @@ def load_church_settings():
         db.close()
 
 
+def is_onboarding_settings_complete(settings_payload):
+    if not settings_payload:
+        return False
+
+    required_text_fields = (
+        "church_name",
+        "main_service_frequency",
+        "preferred_followup_style",
+    )
+    required_numeric_fields = (
+        "watch_missed_services",
+        "at_risk_missed_services",
+        "critical_missed_services",
+    )
+
+    for field_name in required_text_fields:
+        value = settings_payload.get(field_name)
+        if value is None or not str(value).strip():
+            return False
+
+    for field_name in required_numeric_fields:
+        if settings_payload.get(field_name) is None:
+            return False
+
+    return True
+
+
 def update_church_settings(
     church_name,
     main_service_frequency,
@@ -577,10 +630,17 @@ def update_church_settings(
 
 
 def init_session_state():
-    if "planning_center_connected" not in st.session_state:
+    if "persisted_setup_loaded" not in st.session_state:
+        persisted_settings = load_church_settings()
         st.session_state.planning_center_connected = has_stored_planning_center_token()
-    if "onboarding_completed" not in st.session_state:
-        st.session_state.onboarding_completed = False
+        st.session_state.onboarding_completed = is_onboarding_settings_complete(persisted_settings)
+        st.session_state.persisted_setup_loaded = True
+    else:
+        if "planning_center_connected" not in st.session_state:
+            st.session_state.planning_center_connected = has_stored_planning_center_token()
+        if "onboarding_completed" not in st.session_state:
+            persisted_settings = load_church_settings()
+            st.session_state.onboarding_completed = is_onboarding_settings_complete(persisted_settings)
     if "selected_member_id" not in st.session_state:
         st.session_state.selected_member_id = None
     if "outreach_messages" not in st.session_state:
@@ -601,6 +661,8 @@ def init_session_state():
         st.session_state.planning_center_oauth_state = None
     if "planning_center_last_oauth_code" not in st.session_state:
         st.session_state.planning_center_last_oauth_code = None
+    if "planning_center_sync_running" not in st.session_state:
+        st.session_state.planning_center_sync_running = False
 
 
 def has_stored_planning_center_token():
@@ -627,7 +689,11 @@ def has_stored_planning_center_token():
             if token is not None:
                 token.church_id = active_church_id
                 db.commit()
-        return bool(token and token.access_token)
+        if not token:
+            return False
+
+        token_status = str(token.connection_status or "").strip().lower()
+        return bool(token.access_token and token_status == "connected")
     finally:
         db.close()
 
@@ -651,33 +717,37 @@ def format_sync_timestamp(value):
 
 
 def run_refresh_pipeline():
-    ingest_code, ingest_output = run_module("data.ingest")
-    if ingest_code != 0:
+    st.session_state.planning_center_sync_running = True
+    try:
+        ingest_code, ingest_output = run_module("data.ingest")
+        if ingest_code != 0:
+            return {
+                "ok": False,
+                "error": "`python -m data.ingest` failed",
+                "output": ingest_output,
+            }
+
+        risk_code, risk_output = run_module("scoring.save_risk")
+        if risk_code != 0:
+            return {
+                "ok": False,
+                "error": "`python -m scoring.save_risk` failed",
+                "output": risk_output,
+            }
+
+        sync_counts = extract_sync_counts(ingest_output)
+        update_planning_center_sync_summary(sync_counts)
+
         return {
-            "ok": False,
-            "error": "`python -m data.ingest` failed",
-            "output": ingest_output,
+            "ok": True,
+            "logs": {
+                "ingest": ingest_output,
+                "save_risk": risk_output,
+            },
+            "sync_counts": sync_counts,
         }
-
-    risk_code, risk_output = run_module("scoring.save_risk")
-    if risk_code != 0:
-        return {
-            "ok": False,
-            "error": "`python -m scoring.save_risk` failed",
-            "output": risk_output,
-        }
-
-    sync_counts = extract_sync_counts(ingest_output)
-    update_planning_center_sync_summary(sync_counts)
-
-    return {
-        "ok": True,
-        "logs": {
-            "ingest": ingest_output,
-            "save_risk": risk_output,
-        },
-        "sync_counts": sync_counts,
-    }
+    finally:
+        st.session_state.planning_center_sync_running = False
 
 
 def render_refresh_button():
@@ -1138,7 +1208,7 @@ def render_dashboard_page(metrics, member_rows, settings, insights):
     church_name = settings.get("church_name") or "Shepherd"
     sync_summary = insights.get("planning_center_sync") or get_planning_center_integration_summary()
     header_chips = [
-        build_inline_badge("Planning Center synced", tone="accent", icon_name="shield"),
+        build_planning_center_status_badge(sync_summary),
         build_inline_badge(
             f"{insights['at_risk_total']} members need follow-up",
             tone="critical" if insights["at_risk_total"] else "healthy",
@@ -1797,6 +1867,7 @@ def render_settings_page():
         subtitle="Engagement thresholds, signal toggles, and follow-up defaults are managed here without touching your integrations or backend logic.",
         eyebrow="Settings",
         chips=[build_inline_badge(current_settings["church_name"] or "Church", tone="accent", icon_name="building")],
+        meta_badge=build_planning_center_status_badge(integration_summary),
     )
 
     with st.container(border=True):
@@ -1813,16 +1884,18 @@ def render_settings_page():
                     ("Last sync", format_sync_timestamp(integration_summary["last_sync_at"])),
                     ("Members imported", integration_summary["members_imported"]),
                     ("Attendance imported", integration_summary["attendance_imported"]),
-                ]
+                ],
+                compact=True,
             )
         )
 
-        action_col1, action_col2 = st.columns(2, gap="medium")
+        action_col1, action_col2 = st.columns(2, gap="small", vertical_alignment="bottom")
         with action_col1:
             if st.button(
                 "Reconnect Planning Center",
                 key="settings_reconnect_planning_center",
                 width="stretch",
+                type="secondary",
             ):
                 try:
                     begin_planning_center_oauth()
@@ -1835,11 +1908,13 @@ def render_settings_page():
                     )
 
         with action_col2:
+            sync_running = bool(st.session_state.get("planning_center_sync_running", False))
             if st.button(
-                "Run Sync Now",
+                "Syncing…" if sync_running else "Run Sync Now",
                 key="settings_run_sync_now",
                 width="stretch",
                 type="primary",
+                disabled=sync_running,
             ):
                 with st.spinner("Running Planning Center sync and risk refresh..."):
                     sync_result = run_refresh_pipeline()
@@ -1859,9 +1934,9 @@ def render_settings_page():
         if st.session_state.connection_error:
             st.error(st.session_state.connection_error)
 
-    render_html_block("<div style='height:0.75rem;'></div>")
+    render_html_block("<div style='height:0.4rem;'></div>")
 
-    overview_col, form_col = st.columns([1.02, 1.28], gap="large")
+    overview_col, form_col = st.columns([1.02, 1.28], gap="medium")
     with overview_col:
         with st.container(border=True):
             render_surface_header(
@@ -1911,7 +1986,7 @@ def render_settings_page():
             )
 
             with st.form("church_settings_form"):
-                st.markdown("##### Church profile")
+                render_html_block("<div class='settings-form-section'>Church profile</div>")
                 church_name = st.text_input(
                     "Church name",
                     value=current_settings["church_name"] or "",
@@ -1928,7 +2003,7 @@ def render_settings_page():
                     ),
                 )
 
-                st.markdown("##### Risk thresholds")
+                render_html_block("<div class='settings-form-section'>Risk thresholds</div>")
                 threshold_col1, threshold_col2, threshold_col3 = st.columns(3)
                 watch_missed_services = threshold_col1.number_input(
                     "Watch missed services",
@@ -1949,7 +2024,7 @@ def render_settings_page():
                     step=1,
                 )
 
-                st.markdown("##### Signal toggles")
+                render_html_block("<div class='settings-form-section'>Signal toggles</div>")
                 signal_col1, signal_col2 = st.columns(2)
                 small_groups_enabled = signal_col1.checkbox(
                     "Small groups enabled",
@@ -1968,7 +2043,7 @@ def render_settings_page():
                     value=bool(current_settings["email_engagement_enabled"]),
                 )
 
-                st.markdown("##### Follow-up voice")
+                render_html_block("<div class='settings-form-section'>Follow-up voice</div>")
                 preferred_followup_style = st.text_area(
                     "Preferred follow-up style",
                     value=current_settings["preferred_followup_style"] or "",

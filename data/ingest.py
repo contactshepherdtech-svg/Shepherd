@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from data.schema import (
     Attendance,
+    IntegrationToken,
     Member,
     SessionLocal,
     get_or_create_default_church,
@@ -32,12 +33,49 @@ def parse_pco_datetime(timestamp):
     return parsed
 
 
+def _get_or_create_planning_center_token(db, church_id):
+    token = (
+        db.query(IntegrationToken)
+        .filter(
+            IntegrationToken.provider == "planning_center",
+            IntegrationToken.church_id == church_id,
+        )
+        .first()
+    )
+    if token is None:
+        token = (
+            db.query(IntegrationToken)
+            .filter(
+                IntegrationToken.provider == "planning_center",
+                IntegrationToken.church_id.is_(None),
+            )
+            .first()
+        )
+    if token is None:
+        token = (
+            db.query(IntegrationToken)
+            .filter(IntegrationToken.provider == "planning_center")
+            .first()
+        )
+    if token is None:
+        token = IntegrationToken(
+            provider="planning_center",
+            church_id=church_id,
+        )
+        db.add(token)
+
+    token.church_id = church_id
+    return token
+
+
 def save_people():
     init_db()
     db = SessionLocal()
 
     try:
         active_church = get_or_create_default_church(db)
+        token = _get_or_create_planning_center_token(db, active_church.id)
+
         people = get_people(10)
         checkins = get_checkins(25)
 
@@ -135,6 +173,12 @@ def save_people():
             )
             saved_attendance_count += 1
 
+        token.connection_status = "connected"
+        token.last_sync_at = datetime.utcnow()
+        token.members_imported = saved_members_count
+        token.attendance_imported = saved_attendance_count
+        token.updated_at = datetime.utcnow()
+
         db.commit()
 
         print(f"Saved {saved_members_count} members")
@@ -142,6 +186,17 @@ def save_people():
         print(f"Members imported: {saved_members_count}")
         print(f"Emails found: {emails_found_count}")
         print(f"Missing emails: {saved_members_count - emails_found_count}")
+    except Exception:
+        db.rollback()
+        try:
+            active_church = get_or_create_default_church(db)
+            token = _get_or_create_planning_center_token(db, active_church.id)
+            token.connection_status = "error"
+            token.updated_at = datetime.utcnow()
+            db.commit()
+        except Exception:
+            db.rollback()
+        raise
     finally:
         db.close()
 

@@ -110,11 +110,14 @@ def render_html_block(html):
     st.html(clean_html(html), width="stretch")
 
 
-def render_page_header(title, subtitle=None, eyebrow=None, show_date=False, chips=None):
+def render_page_header(title, subtitle=None, eyebrow=None, show_date=False, chips=None, meta_badge=None):
     chips = chips or []
-    date_html = ""
+    meta_parts = []
+    if meta_badge:
+        meta_parts.append(f"<div class='page-status-chip'>{meta_badge}</div>")
     if show_date:
-        date_html = f"<div class='page-meta'>{datetime.now().strftime('%A, %B %d, %Y')}</div>"
+        meta_parts.append(f"<div class='page-meta'>{datetime.now().strftime('%A, %B %d, %Y')}</div>")
+    meta_html = f"<div class='page-meta-stack'>{''.join(meta_parts)}</div>" if meta_parts else ""
 
     chips_html = "".join(chips)
     eyebrow_html = f"<div class='page-kicker'>{escape_html(eyebrow)}</div>" if eyebrow else ""
@@ -130,7 +133,7 @@ def render_page_header(title, subtitle=None, eyebrow=None, show_date=False, chip
                 </div>
                 {subtitle_html}
             </div>
-            {date_html}
+            {meta_html}
         </div>
         """
     )
@@ -295,7 +298,7 @@ def build_recent_change_items(items):
     return clean_html(f"<div class='timeline-list'>{''.join(rows_html)}</div>")
 
 
-def build_key_value_card(pairs):
+def build_key_value_card(pairs, compact=False):
     rows_html = "".join(
         f"""
         <div class="settings-row">
@@ -305,7 +308,8 @@ def build_key_value_card(pairs):
         """
         for key, value in pairs
     )
-    return clean_html(f"<div class='settings-card'>{rows_html}</div>")
+    compact_class = " compact" if compact else ""
+    return clean_html(f"<div class='settings-card{compact_class}'>{rows_html}</div>")
 
 
 def build_empty_state(icon_name, title, copy):

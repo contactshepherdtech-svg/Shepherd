@@ -65,6 +65,10 @@ def inject_app_styles():
             background: transparent;
         }
 
+        [data-testid="stStatusWidget"] {
+            display: none;
+        }
+
         [data-testid="stMainBlockContainer"] {
             max-width: 1400px;
             padding-top: 1.4rem;
@@ -457,6 +461,19 @@ def inject_app_styles():
             font-size: 0.82rem;
             color: rgba(29,43,36,0.40);
             padding-bottom: 0.25rem;
+        }
+
+        .page-meta-stack {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.35rem;
+        }
+
+        .page-status-chip .inline-badge {
+            font-size: 0.74rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
         }
 
         .page-chip-row {
@@ -930,6 +947,18 @@ def inject_app_styles():
             box-shadow: var(--shadow-soft);
         }
 
+        .settings-card.compact .settings-row {
+            padding: 0.62rem 0.84rem;
+        }
+
+        .settings-card.compact .settings-key {
+            font-size: 0.79rem;
+        }
+
+        .settings-card.compact .settings-value {
+            font-size: 0.81rem;
+        }
+
         .settings-row {
             display: flex;
             align-items: center;
@@ -953,6 +982,15 @@ def inject_app_styles():
             font-weight: 600;
             color: #1D2B24;
             text-align: right;
+        }
+
+        .settings-form-section {
+            margin: 0.18rem 0 0.48rem;
+            font-size: 0.74rem;
+            letter-spacing: 0.10em;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: rgba(29,43,36,0.44);
         }
 
         /* ── Empty state ── */
@@ -1125,6 +1163,9 @@ def inject_app_styles():
             }
             .page-header {
                 flex-direction: column;
+                align-items: flex-start;
+            }
+            .page-meta-stack {
                 align-items: flex-start;
             }
         }
