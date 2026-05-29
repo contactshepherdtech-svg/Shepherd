@@ -37,10 +37,21 @@ SessionLocal = sessionmaker(
 Base = declarative_base()
 
 
+class Church(Base):
+    __tablename__ = "churches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String)
+    planning_center_org_id = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class Member(Base):
     __tablename__ = "members"
 
     id = Column(Integer, primary_key=True, index=True)
+    church_id = Column(Integer, index=True)
     pco_id = Column(String, unique=True, index=True)
     name = Column(String)
     email = Column(String)
@@ -53,6 +64,7 @@ class Attendance(Base):
     __tablename__ = "attendance"
 
     id = Column(Integer, primary_key=True, index=True)
+    church_id = Column(Integer, index=True)
     pco_checkin_id = Column(String, unique=True, index=True)
     member_pco_id = Column(String, index=True)
     attended_at = Column(DateTime)
@@ -64,6 +76,7 @@ class RiskScore(Base):
     __tablename__ = "risk_scores"
 
     id = Column(Integer, primary_key=True, index=True)
+    church_id = Column(Integer, index=True)
     member_pco_id = Column(String, index=True)
     score = Column(Integer)
     tier = Column(String)
@@ -75,6 +88,7 @@ class ChurchSettings(Base):
     __tablename__ = "church_settings"
 
     id = Column(Integer, primary_key=True, index=True)
+    church_id = Column(Integer, index=True)
     church_name = Column(String)
     main_service_frequency = Column(String)
     watch_missed_services = Column(Integer)
@@ -95,6 +109,7 @@ class IntegrationToken(Base):
     __tablename__ = "integration_tokens"
 
     id = Column(Integer, primary_key=True, index=True)
+    church_id = Column(Integer, index=True)
     provider = Column(String, unique=True, index=True)
     access_token = Column(String)
     refresh_token = Column(String)
@@ -108,6 +123,17 @@ class IntegrationToken(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+def get_or_create_default_church(db):
+    default_name = "Shepherd Demo Church"
+    church = db.query(Church).filter(Church.name == default_name).first()
+    if church is None:
+        church = Church(name=default_name)
+        db.add(church)
+        db.commit()
+        db.refresh(church)
+    return church
+
+
 def init_db():
     try:
         Base.metadata.create_all(bind=engine)
@@ -117,40 +143,60 @@ def init_db():
         raise RuntimeError("Unable to initialize database schema.") from error
 
     inspector = inspect(engine)
-    column_names = {column["name"] for column in inspector.get_columns("members")}
+    member_columns = {column["name"] for column in inspector.get_columns("members")}
+    attendance_columns = {column["name"] for column in inspector.get_columns("attendance")}
+    risk_columns = {column["name"] for column in inspector.get_columns("risk_scores")}
+    settings_columns = {column["name"] for column in inspector.get_columns("church_settings")}
+    integration_columns = {column["name"] for column in inspector.get_columns("integration_tokens")}
+    church_columns = {column["name"] for column in inspector.get_columns("churches")}
 
-    if "email" not in column_names:
-        with engine.begin() as connection:
-            connection.exec_driver_sql("ALTER TABLE members ADD COLUMN email VARCHAR")
-        logger.info("Added missing members.email column.")
-
-    integration_columns = {
-        column["name"] for column in inspector.get_columns("integration_tokens")
-    }
     with engine.begin() as connection:
+        if "email" not in member_columns:
+            connection.exec_driver_sql("ALTER TABLE members ADD COLUMN email VARCHAR")
+            logger.info("Added missing members.email column.")
+        if "church_id" not in member_columns:
+            connection.exec_driver_sql("ALTER TABLE members ADD COLUMN church_id INTEGER")
+        if "church_id" not in attendance_columns:
+            connection.exec_driver_sql("ALTER TABLE attendance ADD COLUMN church_id INTEGER")
+        if "church_id" not in risk_columns:
+            connection.exec_driver_sql("ALTER TABLE risk_scores ADD COLUMN church_id INTEGER")
+        if "church_id" not in settings_columns:
+            connection.exec_driver_sql("ALTER TABLE church_settings ADD COLUMN church_id INTEGER")
+        if "church_id" not in integration_columns:
+            connection.exec_driver_sql("ALTER TABLE integration_tokens ADD COLUMN church_id INTEGER")
         if "connection_status" not in integration_columns:
-            connection.exec_driver_sql(
-                "ALTER TABLE integration_tokens ADD COLUMN connection_status VARCHAR"
-            )
+            connection.exec_driver_sql("ALTER TABLE integration_tokens ADD COLUMN connection_status VARCHAR")
         if "last_sync_at" not in integration_columns:
-            connection.exec_driver_sql(
-                "ALTER TABLE integration_tokens ADD COLUMN last_sync_at TIMESTAMP"
-            )
+            connection.exec_driver_sql("ALTER TABLE integration_tokens ADD COLUMN last_sync_at TIMESTAMP")
         if "members_imported" not in integration_columns:
-            connection.exec_driver_sql(
-                "ALTER TABLE integration_tokens ADD COLUMN members_imported INTEGER"
-            )
+            connection.exec_driver_sql("ALTER TABLE integration_tokens ADD COLUMN members_imported INTEGER")
         if "attendance_imported" not in integration_columns:
-            connection.exec_driver_sql(
-                "ALTER TABLE integration_tokens ADD COLUMN attendance_imported INTEGER"
-            )
+            connection.exec_driver_sql("ALTER TABLE integration_tokens ADD COLUMN attendance_imported INTEGER")
+        if "planning_center_org_id" not in church_columns:
+            connection.exec_driver_sql("ALTER TABLE churches ADD COLUMN planning_center_org_id VARCHAR")
 
     db = SessionLocal()
     try:
-        existing_settings = db.query(ChurchSettings).first()
+        default_church = get_or_create_default_church(db)
+
+        existing_settings = (
+            db.query(ChurchSettings)
+            .filter(ChurchSettings.church_id == default_church.id)
+            .first()
+        )
+        if existing_settings is None:
+            existing_settings = (
+                db.query(ChurchSettings)
+                .filter(ChurchSettings.church_id.is_(None))
+                .first()
+            )
+            if existing_settings is not None:
+                existing_settings.church_id = default_church.id
+                db.commit()
         if existing_settings is None:
             db.add(
                 ChurchSettings(
+                    church_id=default_church.id,
                     church_name="Shepherd Demo Church",
                     main_service_frequency="weekly",
                     watch_missed_services=2,
@@ -167,5 +213,27 @@ def init_db():
             )
             db.commit()
             logger.info("Default church settings created.")
+
+        db.query(Member).filter(Member.church_id.is_(None)).update(
+            {Member.church_id: default_church.id},
+            synchronize_session=False,
+        )
+        db.query(Attendance).filter(Attendance.church_id.is_(None)).update(
+            {Attendance.church_id: default_church.id},
+            synchronize_session=False,
+        )
+        db.query(RiskScore).filter(RiskScore.church_id.is_(None)).update(
+            {RiskScore.church_id: default_church.id},
+            synchronize_session=False,
+        )
+        db.query(ChurchSettings).filter(ChurchSettings.church_id.is_(None)).update(
+            {ChurchSettings.church_id: default_church.id},
+            synchronize_session=False,
+        )
+        db.query(IntegrationToken).filter(IntegrationToken.church_id.is_(None)).update(
+            {IntegrationToken.church_id: default_church.id},
+            synchronize_session=False,
+        )
+        db.commit()
     finally:
         db.close()

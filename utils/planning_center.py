@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import requests
 from dotenv import load_dotenv
 
-from data.schema import IntegrationToken, SessionLocal
+from data.schema import IntegrationToken, SessionLocal, get_or_create_default_church
 from utils.planning_center_oauth import refresh_access_token
 
 
@@ -47,11 +47,28 @@ def _save_refreshed_token(db, token_record, token_payload):
 def _get_oauth_access_token(force_refresh=False):
     db = SessionLocal()
     try:
+        active_church = get_or_create_default_church(db)
         token_record = (
             db.query(IntegrationToken)
-            .filter(IntegrationToken.provider == "planning_center")
+            .filter(
+                IntegrationToken.provider == "planning_center",
+                IntegrationToken.church_id == active_church.id,
+            )
             .first()
         )
+        if token_record is None:
+            token_record = (
+                db.query(IntegrationToken)
+                .filter(
+                    IntegrationToken.provider == "planning_center",
+                    IntegrationToken.church_id.is_(None),
+                )
+                .first()
+            )
+            if token_record is not None:
+                token_record.church_id = active_church.id
+                db.commit()
+
         if token_record is None or not token_record.access_token:
             return None
 

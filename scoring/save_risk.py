@@ -1,6 +1,14 @@
 from datetime import datetime
 
-from data.schema import SessionLocal, Member, Attendance, RiskScore, ChurchSettings, init_db
+from data.schema import (
+    Attendance,
+    ChurchSettings,
+    Member,
+    RiskScore,
+    SessionLocal,
+    get_or_create_default_church,
+    init_db,
+)
 from scoring.churn import calculate_risk
 
 
@@ -9,13 +17,30 @@ def save_risk_scores():
     db = SessionLocal()
 
     try:
-        church_settings = db.query(ChurchSettings).first()
-        members = db.query(Member).all()
+        active_church = get_or_create_default_church(db)
+        church_settings = (
+            db.query(ChurchSettings)
+            .filter(ChurchSettings.church_id == active_church.id)
+            .first()
+        )
+        if church_settings is None:
+            church_settings = (
+                db.query(ChurchSettings)
+                .filter(ChurchSettings.church_id.is_(None))
+                .first()
+            )
+            if church_settings is not None:
+                church_settings.church_id = active_church.id
+                db.commit()
+        members = db.query(Member).filter(Member.church_id == active_church.id).all()
 
         for member in members:
             attendance_records = (
                 db.query(Attendance)
-                .filter(Attendance.member_pco_id == member.pco_id)
+                .filter(
+                    Attendance.church_id == active_church.id,
+                    Attendance.member_pco_id == member.pco_id,
+                )
                 .all()
             )
 
@@ -24,11 +49,24 @@ def save_risk_scores():
 
             existing_risk = (
                 db.query(RiskScore)
-                .filter(RiskScore.member_pco_id == member.pco_id)
+                .filter(
+                    RiskScore.church_id == active_church.id,
+                    RiskScore.member_pco_id == member.pco_id,
+                )
                 .first()
             )
+            if existing_risk is None:
+                existing_risk = (
+                    db.query(RiskScore)
+                    .filter(
+                        RiskScore.church_id.is_(None),
+                        RiskScore.member_pco_id == member.pco_id,
+                    )
+                    .first()
+                )
 
             if existing_risk:
+                existing_risk.church_id = active_church.id
                 existing_risk.score = risk["score"]
                 existing_risk.tier = risk["tier"]
                 existing_risk.reasons = reasons_text
@@ -36,6 +74,7 @@ def save_risk_scores():
             else:
                 db.add(
                     RiskScore(
+                        church_id=active_church.id,
                         member_pco_id=member.pco_id,
                         score=risk["score"],
                         tier=risk["tier"],

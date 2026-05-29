@@ -1,6 +1,12 @@
 from datetime import datetime, timezone
 
-from data.schema import SessionLocal, init_db, Member, Attendance
+from data.schema import (
+    Attendance,
+    Member,
+    SessionLocal,
+    get_or_create_default_church,
+    init_db,
+)
 from utils.planning_center import get_people, get_checkins
 
 
@@ -31,6 +37,7 @@ def save_people():
     db = SessionLocal()
 
     try:
+        active_church = get_or_create_default_church(db)
         people = get_people(10)
         checkins = get_checkins(25)
 
@@ -50,9 +57,26 @@ def save_people():
         emails_found_count = 0
 
         for person in people_to_import:
-            existing_member = db.query(Member).filter(Member.pco_id == person["pco_id"]).first()
+            existing_member = (
+                db.query(Member)
+                .filter(
+                    Member.church_id == active_church.id,
+                    Member.pco_id == person["pco_id"],
+                )
+                .first()
+            )
+            if existing_member is None:
+                existing_member = (
+                    db.query(Member)
+                    .filter(
+                        Member.church_id.is_(None),
+                        Member.pco_id == person["pco_id"],
+                    )
+                    .first()
+                )
 
             if existing_member:
+                existing_member.church_id = active_church.id
                 existing_member.name = person["name"]
                 existing_member.email = person.get("email")
                 existing_member.status = person["status"]
@@ -60,6 +84,7 @@ def save_people():
             else:
                 db.add(
                     Member(
+                        church_id=active_church.id,
                         pco_id=person["pco_id"],
                         name=person["name"],
                         email=person.get("email"),
@@ -79,15 +104,29 @@ def save_people():
 
             existing_checkin = (
                 db.query(Attendance)
-                .filter(Attendance.pco_checkin_id == pco_checkin_id)
+                .filter(
+                    Attendance.church_id == active_church.id,
+                    Attendance.pco_checkin_id == pco_checkin_id,
+                )
                 .first()
             )
+            if existing_checkin is None:
+                existing_checkin = (
+                    db.query(Attendance)
+                    .filter(
+                        Attendance.church_id.is_(None),
+                        Attendance.pco_checkin_id == pco_checkin_id,
+                    )
+                    .first()
+                )
 
             if existing_checkin:
+                existing_checkin.church_id = active_church.id
                 continue
 
             db.add(
                 Attendance(
+                    church_id=active_church.id,
                     pco_checkin_id=pco_checkin_id,
                     member_pco_id=checkin.get("member_pco_id"),
                     attended_at=parse_pco_datetime(checkin.get("attended_at")),

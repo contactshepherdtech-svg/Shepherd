@@ -18,6 +18,7 @@ from data.schema import (
     Member,
     RiskScore,
     SessionLocal,
+    get_or_create_default_church,
     init_db,
 )
 from ui import (
@@ -120,14 +121,39 @@ def extract_sync_counts(ingest_output):
     }
 
 
-def get_planning_center_integration_summary():
+def get_active_church_id():
+    db = SessionLocal()
+    try:
+        active_church = get_or_create_default_church(db)
+        return active_church.id
+    finally:
+        db.close()
+
+
+def get_planning_center_integration_summary(church_id=None):
+    active_church_id = church_id or get_active_church_id()
     db = SessionLocal()
     try:
         token = (
             db.query(IntegrationToken)
-            .filter(IntegrationToken.provider == "planning_center")
+            .filter(
+                IntegrationToken.provider == "planning_center",
+                IntegrationToken.church_id == active_church_id,
+            )
             .first()
         )
+        if token is None:
+            token = (
+                db.query(IntegrationToken)
+                .filter(
+                    IntegrationToken.provider == "planning_center",
+                    IntegrationToken.church_id.is_(None),
+                )
+                .first()
+            )
+            if token is not None:
+                token.church_id = active_church_id
+                db.commit()
         if not token:
             return {
                 "provider": "Planning Center",
@@ -138,7 +164,7 @@ def get_planning_center_integration_summary():
                 "attendance_imported": 0,
             }
 
-        return {
+        summary = {
             "provider": "Planning Center",
             "status": (token.connection_status or "connected").title(),
             "connected": bool(token.access_token),
@@ -146,23 +172,41 @@ def get_planning_center_integration_summary():
             "members_imported": int(token.members_imported or 0),
             "attendance_imported": int(token.attendance_imported or 0),
         }
+        return summary
     finally:
         db.close()
 
 
-def update_planning_center_sync_summary(sync_counts=None):
+def update_planning_center_sync_summary(sync_counts=None, church_id=None):
     sync_counts = sync_counts or {"members_imported": 0, "attendance_imported": 0}
+    active_church_id = church_id or get_active_church_id()
     db = SessionLocal()
     try:
         token = (
             db.query(IntegrationToken)
-            .filter(IntegrationToken.provider == "planning_center")
+            .filter(
+                IntegrationToken.provider == "planning_center",
+                IntegrationToken.church_id == active_church_id,
+            )
             .first()
         )
         if token is None:
-            token = IntegrationToken(provider="planning_center")
+            token = (
+                db.query(IntegrationToken)
+                .filter(
+                    IntegrationToken.provider == "planning_center",
+                    IntegrationToken.church_id.is_(None),
+                )
+                .first()
+            )
+        if token is None:
+            token = IntegrationToken(
+                provider="planning_center",
+                church_id=active_church_id,
+            )
             db.add(token)
 
+        token.church_id = active_church_id
         token.connection_status = "connected"
         token.last_sync_at = datetime.utcnow()
         token.members_imported = int(sync_counts.get("members_imported") or 0)
@@ -344,22 +388,44 @@ def build_dashboard_insights(metrics, member_rows, settings):
 def load_dashboard_data():
     db = SessionLocal()
     try:
-        settings = db.query(ChurchSettings).first()
-        total_members = db.query(Member).count()
+        active_church = get_or_create_default_church(db)
+        church_id = active_church.id
 
-        healthy_count = db.query(RiskScore).filter(RiskScore.tier == "Healthy").count()
-        watch_count = db.query(RiskScore).filter(RiskScore.tier == "Watch").count()
-        at_risk_count = db.query(RiskScore).filter(RiskScore.tier == "At Risk").count()
-        critical_count = db.query(RiskScore).filter(RiskScore.tier == "Critical").count()
-
-        rows = (
-            db.query(Member, RiskScore)
-            .outerjoin(RiskScore, Member.pco_id == RiskScore.member_pco_id)
-            .all()
+        settings = (
+            db.query(ChurchSettings)
+            .filter(ChurchSettings.church_id == church_id)
+            .first()
         )
+        total_members = db.query(Member).filter(Member.church_id == church_id).count()
+
+        healthy_count = (
+            db.query(RiskScore)
+            .filter(RiskScore.church_id == church_id, RiskScore.tier == "Healthy")
+            .count()
+        )
+        watch_count = (
+            db.query(RiskScore)
+            .filter(RiskScore.church_id == church_id, RiskScore.tier == "Watch")
+            .count()
+        )
+        at_risk_count = (
+            db.query(RiskScore)
+            .filter(RiskScore.church_id == church_id, RiskScore.tier == "At Risk")
+            .count()
+        )
+        critical_count = (
+            db.query(RiskScore)
+            .filter(RiskScore.church_id == church_id, RiskScore.tier == "Critical")
+            .count()
+        )
+
+        members = db.query(Member).filter(Member.church_id == church_id).all()
+        risk_rows = db.query(RiskScore).filter(RiskScore.church_id == church_id).all()
+        risk_by_member_id = {risk.member_pco_id: risk for risk in risk_rows}
 
         attendance_rows = (
             db.query(Attendance.member_pco_id, Attendance.attended_at)
+            .filter(Attendance.church_id == church_id)
             .order_by(Attendance.attended_at.desc())
             .all()
         )
@@ -376,7 +442,8 @@ def load_dashboard_data():
                     stats["last_attended"] = attended_at
 
         member_rows = []
-        for member, risk in rows:
+        for member in members:
+            risk = risk_by_member_id.get(member.pco_id)
             member_attendance = attendance_stats.get(
                 member.pco_id,
                 {"attendance_count": 0, "last_attended": None, "history": []},
@@ -418,9 +485,10 @@ def load_dashboard_data():
             "email_engagement_enabled": settings.email_engagement_enabled if settings else False,
             "giving_enabled": settings.giving_enabled if settings else False,
             "volunteer_importance": settings.volunteer_importance if settings else "medium",
+            "church_id": church_id,
         }
         insights = build_dashboard_insights(metrics, member_rows, settings_payload)
-        integration_summary = get_planning_center_integration_summary()
+        integration_summary = get_planning_center_integration_summary(church_id=church_id)
         insights["planning_center_sync"] = integration_summary
         if integration_summary["last_sync_at"]:
             insights["last_sync"] = integration_summary["last_sync_at"]
@@ -432,7 +500,12 @@ def load_dashboard_data():
 def load_church_settings():
     db = SessionLocal()
     try:
-        settings = db.query(ChurchSettings).first()
+        active_church = get_or_create_default_church(db)
+        settings = (
+            db.query(ChurchSettings)
+            .filter(ChurchSettings.church_id == active_church.id)
+            .first()
+        )
         if settings is None:
             return None
 
@@ -471,11 +544,17 @@ def update_church_settings(
 ):
     db = SessionLocal()
     try:
-        settings = db.query(ChurchSettings).first()
+        active_church = get_or_create_default_church(db)
+        settings = (
+            db.query(ChurchSettings)
+            .filter(ChurchSettings.church_id == active_church.id)
+            .first()
+        )
         if settings is None:
-            settings = ChurchSettings()
+            settings = ChurchSettings(church_id=active_church.id)
             db.add(settings)
 
+        settings.church_id = active_church.id
         settings.church_name = church_name
         settings.main_service_frequency = main_service_frequency
         settings.watch_missed_services = int(watch_missed_services)
@@ -525,13 +604,29 @@ def init_session_state():
 
 
 def has_stored_planning_center_token():
+    active_church_id = get_active_church_id()
     db = SessionLocal()
     try:
         token = (
             db.query(IntegrationToken)
-            .filter(IntegrationToken.provider == "planning_center")
+            .filter(
+                IntegrationToken.provider == "planning_center",
+                IntegrationToken.church_id == active_church_id,
+            )
             .first()
         )
+        if token is None:
+            token = (
+                db.query(IntegrationToken)
+                .filter(
+                    IntegrationToken.provider == "planning_center",
+                    IntegrationToken.church_id.is_(None),
+                )
+                .first()
+            )
+            if token is not None:
+                token.church_id = active_church_id
+                db.commit()
         return bool(token and token.access_token)
     finally:
         db.close()
@@ -648,17 +743,34 @@ def _save_planning_center_token(token_payload):
         except (TypeError, ValueError):
             expires_at = None
 
+    active_church_id = get_active_church_id()
     db = SessionLocal()
     try:
         token = (
             db.query(IntegrationToken)
-            .filter(IntegrationToken.provider == "planning_center")
+            .filter(
+                IntegrationToken.provider == "planning_center",
+                IntegrationToken.church_id == active_church_id,
+            )
             .first()
         )
         if token is None:
-            token = IntegrationToken(provider="planning_center")
+            token = (
+                db.query(IntegrationToken)
+                .filter(
+                    IntegrationToken.provider == "planning_center",
+                    IntegrationToken.church_id.is_(None),
+                )
+                .first()
+            )
+        if token is None:
+            token = IntegrationToken(
+                provider="planning_center",
+                church_id=active_church_id,
+            )
             db.add(token)
 
+        token.church_id = active_church_id
         token.provider = "planning_center"
         token.access_token = access_token
         token.refresh_token = refresh_token
