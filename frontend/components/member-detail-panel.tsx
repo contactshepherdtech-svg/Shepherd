@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Activity,
+  BellOff,
   Check,
+  CheckCircle2,
   ClipboardList,
   Copy,
   Mail,
@@ -16,7 +18,12 @@ import {
 import { RiskBadge } from "@/components/risk-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { MemberDirectoryRow } from "@/lib/data";
+import {
+  getOutreachStatuses,
+  upsertOutreachStatus,
+  type MemberDirectoryRow,
+  type OutreachStatusRecord,
+} from "@/lib/data";
 import { formatDate, formatRelativeDays } from "@/lib/format";
 
 type OutreachType = "email" | "sms";
@@ -47,6 +54,9 @@ const missingRiskExplanation = "No risk score available for this member yet.";
 
 type MemberDetailPanelProps = {
   row: MemberDirectoryRow;
+  churchId: number | null;
+  autoGenerateEmail?: boolean;
+  onAutoEmailTriggered?: () => void;
 };
 
 function buildAttendanceBuckets(attendanceHistory: Date[]) {
@@ -91,14 +101,93 @@ function getAttendanceTrend(attendanceHistory: Date[]) {
 }
 
 type GmailDraftStatus = "idle" | "creating" | "success" | "error";
+type OutreachActionState = "idle" | "loading" | "success" | "error";
 
-export function MemberDetailPanel({ row }: MemberDetailPanelProps) {
+export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmailTriggered }: MemberDetailPanelProps) {
   const [generating, setGenerating] = useState<OutreachType | null>(null);
   const [draft, setDraft] = useState<DraftResult | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [gmailStatus, setGmailStatus] = useState<GmailDraftStatus>("idle");
   const [gmailError, setGmailError] = useState<string | null>(null);
+  const [outreachStatus, setOutreachStatus] = useState<OutreachStatusRecord | null>(null);
+  const [outreachActionState, setOutreachActionState] = useState<OutreachActionState>("idle");
+  const [outreachMessage, setOutreachMessage] = useState<string | null>(null);
+  const [outreachError, setOutreachError] = useState<string | null>(null);
+
+  // Load outreach status whenever the displayed member changes
+  useEffect(() => {
+    setOutreachStatus(null);
+    setOutreachActionState("idle");
+    setOutreachMessage(null);
+    setOutreachError(null);
+
+    if (!churchId || !row.member.pco_id) return;
+
+    let active = true;
+    void getOutreachStatuses(churchId).then((all) => {
+      if (!active) return;
+      setOutreachStatus(all.find((s) => s.member_pco_id === row.member.pco_id) ?? null);
+    });
+
+    return () => { active = false; };
+  }, [churchId, row.member.pco_id]);
+
+  // Auto-trigger email generation when navigated from "Draft Email" button
+  useEffect(() => {
+    if (!autoGenerateEmail) return;
+    onAutoEmailTriggered?.();
+    void onGenerate("email");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoGenerateEmail]);
+
+  const handleOutreachAction = async (
+    action: () => Promise<void>,
+    successMessage: string,
+  ) => {
+    setOutreachActionState("loading");
+    setOutreachMessage(null);
+    setOutreachError(null);
+    try {
+      await action();
+      // Re-fetch the fresh status
+      if (churchId && row.member.pco_id) {
+        const all = await getOutreachStatuses(churchId);
+        setOutreachStatus(all.find((s) => s.member_pco_id === row.member.pco_id) ?? null);
+      }
+      setOutreachMessage(successMessage);
+      setOutreachActionState("success");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Action failed. Try again.";
+      setOutreachError(msg);
+      setOutreachActionState("idle");
+    }
+  };
+
+  const onMarkContacted = () => {
+    if (!churchId || !row.member.pco_id) return;
+    void handleOutreachAction(
+      () => upsertOutreachStatus(churchId, row.member.pco_id!, {
+        status: "contacted",
+        contacted_at: new Date().toISOString(),
+      }),
+      "Marked as contacted.",
+    );
+  };
+
+  const onSnooze = (days: number) => {
+    if (!churchId || !row.member.pco_id) return;
+    void handleOutreachAction(
+      () => {
+        const until = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+        return upsertOutreachStatus(churchId, row.member.pco_id!, {
+          status: "snoozed",
+          snoozed_until: until,
+        });
+      },
+      `Snoozed for ${days} days.`,
+    );
+  };
 
   const attendanceTrend = useMemo(() => getAttendanceTrend(row.attendance_history), [row.attendance_history]);
   const attendanceBuckets = useMemo(
@@ -394,6 +483,78 @@ export function MemberDetailPanel({ row }: MemberDetailPanelProps) {
           <CardTitle>Generate communication drafts</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Current outreach status badge */}
+          {outreachStatus && outreachStatus.status !== "active" ? (
+            <div className="rounded-lg border border-border/80 bg-[#F8F2DA] p-3 text-sm">
+              {outreachStatus.status === "contacted" ? (
+                <p className="inline-flex items-center gap-2 font-semibold text-primary">
+                  <CheckCircle2 className="size-4" />
+                  Contacted
+                  {outreachStatus.contacted_at
+                    ? ` on ${new Date(outreachStatus.contacted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                    : ""}
+                </p>
+              ) : outreachStatus.status === "snoozed" && outreachStatus.snoozed_until ? (
+                <p className="inline-flex items-center gap-2 font-semibold text-muted-foreground">
+                  <BellOff className="size-4" />
+                  Snoozed until{" "}
+                  {new Date(outreachStatus.snoozed_until).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* Mark Contacted / Snooze buttons */}
+          {churchId && row.member.pco_id ? (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                Outreach Status
+              </p>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={onMarkContacted}
+                  disabled={outreachActionState === "loading" || outreachStatus?.status === "contacted"}
+                  className="justify-start gap-1.5"
+                >
+                  <CheckCircle2 className="size-3.5" />
+                  {outreachActionState === "loading" ? "Saving..." : "Mark Contacted"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => onSnooze(7)}
+                  disabled={outreachActionState === "loading"}
+                  className="justify-start gap-1.5"
+                >
+                  <BellOff className="size-3.5" />
+                  Snooze 7 Days
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => onSnooze(30)}
+                  disabled={outreachActionState === "loading"}
+                  className="justify-start gap-1.5"
+                >
+                  <BellOff className="size-3.5" />
+                  Snooze 30 Days
+                </Button>
+              </div>
+              {outreachMessage ? (
+                <p className="text-xs font-medium text-primary">{outreachMessage}</p>
+              ) : null}
+              {outreachError ? (
+                <p className="text-xs text-red-600">{outreachError}</p>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="grid gap-3 sm:grid-cols-2">
             <Button
               onClick={() => void onGenerate("email")}

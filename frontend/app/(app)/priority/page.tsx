@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Filter, ListTodo, Phone, Sparkles } from "lucide-react";
 
 import { PageShell } from "@/components/page-shell";
@@ -11,21 +11,35 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   buildMemberDirectoryRows,
   getAttendance,
-  getDefaultChurch,
   getMembers,
+  getOutreachStatuses,
   getPriorityOutreachRows,
   getRiskScores,
+  isVisibleInQueue,
   type MemberDirectoryRow,
+  type OutreachStatusRecord,
   type RiskTier,
 } from "@/lib/data";
+import { useAuth } from "@/lib/auth-context";
 
 const tiers: Array<"All" | RiskTier> = ["All", "Watch", "At Risk", "Critical"];
 
 export default function PriorityPage() {
+  const { churchId } = useAuth();
   const [tier, setTier] = useState<(typeof tiers)[number]>("All");
   const [loading, setLoading] = useState(true);
   const [riskScoreCount, setRiskScoreCount] = useState(0);
   const [queueRows, setQueueRows] = useState<MemberDirectoryRow[]>([]);
+  const [statuses, setStatuses] = useState<OutreachStatusRecord[]>([]);
+
+  const loadStatuses = useCallback(async (id: number) => {
+    const fresh = await getOutreachStatuses(id);
+    setStatuses(fresh);
+  }, []);
+
+  const onStatusChange = useCallback(() => {
+    if (churchId) void loadStatuses(churchId);
+  }, [churchId, loadStatuses]);
 
   useEffect(() => {
     let active = true;
@@ -33,26 +47,28 @@ export default function PriorityPage() {
     const loadQueue = async () => {
       setLoading(true);
 
-      const church = await getDefaultChurch();
-      if (!church) {
+      if (!churchId) {
         if (active) {
           setRiskScoreCount(0);
           setQueueRows([]);
+          setStatuses([]);
           setLoading(false);
         }
         return;
       }
 
-      const [members, attendance, riskScores] = await Promise.all([
-        getMembers(church.id),
-        getAttendance(church.id),
-        getRiskScores(church.id),
+      const [members, attendance, riskScores, outreachStatuses] = await Promise.all([
+        getMembers(churchId),
+        getAttendance(churchId),
+        getRiskScores(churchId),
+        getOutreachStatuses(churchId),
       ]);
 
       if (active) {
         const memberRows = buildMemberDirectoryRows(members, riskScores, attendance);
         setRiskScoreCount(riskScores.length);
         setQueueRows(getPriorityOutreachRows(memberRows));
+        setStatuses(outreachStatuses);
         setLoading(false);
       }
     };
@@ -62,12 +78,13 @@ export default function PriorityPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [churchId]);
 
   const filteredQueue = useMemo(() => {
-    if (tier === "All") return queueRows;
-    return queueRows.filter((row) => row.risk.tier === tier);
-  }, [queueRows, tier]);
+    const byStatus = queueRows.filter((row) => isVisibleInQueue(row.member.pco_id, statuses));
+    if (tier === "All") return byStatus;
+    return byStatus.filter((row) => row.risk.tier === tier);
+  }, [queueRows, statuses, tier]);
 
   const urgentCount = filteredQueue.filter((row) => row.risk.tier === "Critical").length;
 
@@ -185,11 +202,20 @@ export default function PriorityPage() {
 
       <section className="grid gap-3 xl:grid-cols-2">
         {filteredQueue.map((row) => (
-          <PriorityOutreachCard key={row.member.id} row={row} />
+          <PriorityOutreachCard
+            key={row.member.id}
+            row={row}
+            churchId={churchId!}
+            onStatusChange={onStatusChange}
+          />
         ))}
         {!filteredQueue.length ? (
           <Card>
-            <CardContent className="p-6 text-center text-sm text-muted-foreground">No risk scores found.</CardContent>
+            <CardContent className="p-6 text-center text-sm text-muted-foreground">
+              {queueRows.length
+                ? "All members have been contacted or snoozed. Great work!"
+                : "No risk scores found."}
+            </CardContent>
           </Card>
         ) : null}
       </section>

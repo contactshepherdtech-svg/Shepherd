@@ -15,7 +15,6 @@ import {
   getAttendance,
   getAttendanceTrend,
   getChurchHealthScore,
-  getDefaultChurch,
   getEngagementOverview,
   getMembers,
   getPriorityOutreachRows,
@@ -25,8 +24,10 @@ import {
   type MemberDirectoryRow,
   type RiskScoreRecord,
 } from "@/lib/data";
+import { useAuth } from "@/lib/auth-context";
 
 export default function DashboardPage() {
+  const { churchId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [totalMembers, setTotalMembers] = useState(0);
   const [memberRows, setMemberRows] = useState<MemberDirectoryRow[]>([]);
@@ -39,8 +40,7 @@ export default function DashboardPage() {
     const loadData = async () => {
       setLoading(true);
 
-      const church = await getDefaultChurch();
-      if (!church) {
+      if (!churchId) {
         if (active) {
           setTotalMembers(0);
           setMemberRows([]);
@@ -52,9 +52,9 @@ export default function DashboardPage() {
       }
 
       const [members, attendance, riskScores] = await Promise.all([
-        getMembers(church.id),
-        getAttendance(church.id),
-        getRiskScores(church.id),
+        getMembers(churchId),
+        getAttendance(churchId),
+        getRiskScores(churchId),
       ]);
 
       if (active) {
@@ -71,7 +71,7 @@ export default function DashboardPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [churchId]);
 
   const priorityRows = useMemo(() => getPriorityOutreachRows(memberRows).slice(0, 4), [memberRows]);
   const healthScore = useMemo(() => getChurchHealthScore(riskRows), [riskRows]);
@@ -222,7 +222,12 @@ export default function DashboardPage() {
             ) : (
               <div className="grid gap-3 xl:grid-cols-2">
                 {priorityRows.map((row) => (
-                  <PriorityOutreachCard key={row.member.id} row={row} />
+                  <PriorityOutreachCard
+                    key={row.member.id}
+                    row={row}
+                    churchId={churchId ?? 0}
+                    onStatusChange={() => undefined}
+                  />
                 ))}
               </div>
             )}

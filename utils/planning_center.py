@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import requests
 from dotenv import load_dotenv
 
-from data.schema import IntegrationToken, SessionLocal, get_or_create_default_church
+from data.schema import Church, IntegrationToken, SessionLocal, get_or_create_default_church
 from utils.planning_center_oauth import refresh_access_token
 
 
@@ -17,6 +17,37 @@ def _legacy_credentials():
     client_id = os.getenv("PCO_CLIENT_ID") or os.getenv("PLANNING_CENTER_CLIENT_ID")
     client_secret = os.getenv("PCO_CLIENT_SECRET") or os.getenv("PLANNING_CENTER_CLIENT_SECRET")
     return client_id, client_secret
+
+
+def _active_church_id_from_env():
+    raw_church_id = os.getenv("SHEPHERD_ACTIVE_CHURCH_ID")
+    if not raw_church_id:
+        return None
+
+    try:
+        church_id = int(raw_church_id)
+    except ValueError as error:
+        raise RuntimeError(
+            f"Invalid SHEPHERD_ACTIVE_CHURCH_ID={raw_church_id!r}."
+        ) from error
+
+    if church_id <= 0:
+        raise RuntimeError(
+            f"Invalid SHEPHERD_ACTIVE_CHURCH_ID={raw_church_id!r}."
+        )
+
+    return church_id
+
+
+def _get_active_church_id(db):
+    env_church_id = _active_church_id_from_env()
+    if env_church_id is not None:
+        church = db.query(Church).filter(Church.id == env_church_id).first()
+        if church is None:
+            raise RuntimeError(f"Active church not found for church_id={env_church_id}.")
+        return env_church_id
+
+    return get_or_create_default_church(db).id
 
 
 def _save_refreshed_token(db, token_record, token_payload):
@@ -47,16 +78,23 @@ def _save_refreshed_token(db, token_record, token_payload):
 def _get_oauth_access_token(force_refresh=False):
     db = SessionLocal()
     try:
-        active_church = get_or_create_default_church(db)
+        env_church_id = _active_church_id_from_env()
+        active_church_id = _get_active_church_id(db)
+        print(f"Planning Center active church_id: {active_church_id}")
+
         token_record = (
             db.query(IntegrationToken)
             .filter(
                 IntegrationToken.provider == "planning_center",
-                IntegrationToken.church_id == active_church.id,
+                IntegrationToken.church_id == active_church_id,
             )
             .first()
         )
-        if token_record is None:
+
+        token_found = bool(token_record and token_record.access_token)
+        print(f"Planning Center token found: {str(token_found).lower()}")
+
+        if token_record is None and env_church_id is None:
             token_record = (
                 db.query(IntegrationToken)
                 .filter(
@@ -66,10 +104,14 @@ def _get_oauth_access_token(force_refresh=False):
                 .first()
             )
             if token_record is not None:
-                token_record.church_id = active_church.id
+                token_record.church_id = active_church_id
                 db.commit()
 
         if token_record is None or not token_record.access_token:
+            if env_church_id is not None:
+                raise RuntimeError(
+                    f"No Planning Center token found for church_id={active_church_id}"
+                )
             return None
 
         should_refresh = force_refresh

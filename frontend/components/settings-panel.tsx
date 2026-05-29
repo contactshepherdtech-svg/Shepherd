@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/lib/supabase";
 
 type SettingsPanelProps = {
   title: string;
@@ -30,11 +31,13 @@ type SharedPanelProps = {
 };
 
 type PlanningCenterConnectionPanelProps = SharedPanelProps & {
+  churchId: number | null;
   connection: PlanningCenterConnection | null;
   churchName: string;
 };
 
 type SyncStatusPanelProps = SharedPanelProps & {
+  churchId: number | null;
   connection: PlanningCenterConnection | null;
   onSyncComplete: () => Promise<void> | void;
 };
@@ -72,11 +75,47 @@ function Panel({ title, description, icon: Icon, children, actions }: SettingsPa
 }
 
 export function PlanningCenterConnectionPanel({
+  churchId,
   connection,
   churchName,
   loading = false,
 }: PlanningCenterConnectionPanelProps) {
   const connected = isPlanningCenterConnected(connection);
+  const [startingOAuth, setStartingOAuth] = useState(false);
+  const [oauthError, setOauthError] = useState<string | null>(null);
+
+  const startPlanningCenterOAuth = async () => {
+    if (!churchId || !supabase || startingOAuth) return;
+
+    setStartingOAuth(true);
+    setOauthError(null);
+
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (sessionError || !accessToken) {
+        throw new Error("Sign in again before connecting Planning Center.");
+      }
+
+      const response = await fetch(`/api/planning-center/connect?church_id=${churchId}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const result = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
+
+      if (!response.ok || !result?.url) {
+        throw new Error(result?.error || "Could not start Planning Center OAuth.");
+      }
+
+      window.location.assign(result.url);
+    } catch (error) {
+      console.error("Failed to start Planning Center OAuth", error);
+      setOauthError(error instanceof Error ? error.message : "Could not start Planning Center OAuth.");
+    } finally {
+      setStartingOAuth(false);
+    }
+  };
 
   return (
     <Panel
@@ -85,13 +124,19 @@ export function PlanningCenterConnectionPanel({
       icon={Cable}
       actions={
         <>
-          <Button variant="secondary" asChild>
-            <a href="/api/planning-center/connect">Reconnect Planning Center</a>
+          <Button
+            variant="secondary"
+            onClick={() => void startPlanningCenterOAuth()}
+            disabled={!churchId || loading || startingOAuth}
+          >
+            Reconnect Planning Center
           </Button>
-          <Button asChild>
-            <a href="/api/planning-center/connect">
-              {connected ? "Update Authorization" : "Connect Planning Center"}
-            </a>
+          <Button onClick={() => void startPlanningCenterOAuth()} disabled={!churchId || loading || startingOAuth}>
+            {startingOAuth
+              ? "Opening Planning Center..."
+              : connected
+                ? "Update Authorization"
+                : "Connect Planning Center"}
           </Button>
         </>
       }
@@ -113,11 +158,16 @@ export function PlanningCenterConnectionPanel({
           {loading ? "Checking connection status..." : `Workspace: ${churchName}`}
         </p>
       </div>
+      {oauthError ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {oauthError}
+        </div>
+      ) : null}
     </Panel>
   );
 }
 
-export function SyncStatusPanel({ connection, loading = false, onSyncComplete }: SyncStatusPanelProps) {
+export function SyncStatusPanel({ churchId, connection, loading = false, onSyncComplete }: SyncStatusPanelProps) {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const hasLastSync = Boolean(connection?.last_sync_at);
@@ -136,8 +186,26 @@ export function SyncStatusPanel({ connection, loading = false, onSyncComplete }:
     setSyncMessage(null);
 
     try {
+      if (!churchId) {
+        throw new Error("No active church found.");
+      }
+      if (!supabase) {
+        throw new Error("Supabase is not configured.");
+      }
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (sessionError || !accessToken) {
+        throw new Error("Sign in again before running sync.");
+      }
+
       const response = await fetch("/api/sync", {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ church_id: churchId }),
       });
       const result = (await response.json().catch(() => null)) as { success?: boolean; error?: string } | null;
 
@@ -163,8 +231,7 @@ export function SyncStatusPanel({ connection, loading = false, onSyncComplete }:
       icon={RefreshCcw}
       actions={
         <>
-          <Button variant="secondary">Reconnect</Button>
-          <Button onClick={onRunSyncNow} disabled={loading || syncing}>
+          <Button onClick={onRunSyncNow} disabled={loading || syncing || !churchId}>
             {syncing ? "Syncing..." : "Run Sync Now"}
           </Button>
         </>

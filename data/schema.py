@@ -175,6 +175,12 @@ def init_db():
         if "planning_center_org_id" not in church_columns:
             connection.exec_driver_sql("ALTER TABLE churches ADD COLUMN planning_center_org_id VARCHAR")
 
+    if os.getenv("SHEPHERD_ACTIVE_CHURCH_ID"):
+        logger.info(
+            "SHEPHERD_ACTIVE_CHURCH_ID is set; skipping default church setup and backfill."
+        )
+        return
+
     db = SessionLocal()
     try:
         default_church = get_or_create_default_church(db)

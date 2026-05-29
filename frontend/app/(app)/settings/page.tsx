@@ -12,15 +12,15 @@ import { PageShell } from "@/components/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   getChurchSettings,
-  getDefaultChurch,
   getPlanningCenterConnection,
   type ChurchSettingsRecord,
   type PlanningCenterConnection,
 } from "@/lib/data";
+import { useAuth } from "@/lib/auth-context";
 
 export default function SettingsPage() {
+  const { churchId, churchName: activeChurchName, refreshWorkspace } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [churchId, setChurchId] = useState<number | null>(null);
   const [churchName, setChurchName] = useState("Unknown Church");
   const [settings, setSettings] = useState<ChurchSettingsRecord | null>(null);
   const [connection, setConnection] = useState<PlanningCenterConnection | null>(null);
@@ -28,10 +28,8 @@ export default function SettingsPage() {
   const loadSettings = useCallback(async () => {
     setLoading(true);
 
-    const church = await getDefaultChurch();
-    if (!church) {
-      setChurchId(null);
-      setChurchName("Unknown Church");
+    if (!churchId) {
+      setChurchName(activeChurchName ?? "Unknown Church");
       setSettings(null);
       setConnection(null);
       setLoading(false);
@@ -39,16 +37,16 @@ export default function SettingsPage() {
     }
 
     const [churchSettings, planningCenterConnection] = await Promise.all([
-      getChurchSettings(church.id),
-      getPlanningCenterConnection(church.id),
+      getChurchSettings(churchId),
+      getPlanningCenterConnection(churchId),
     ]);
 
-    setChurchId(church.id);
-    setChurchName(church.name?.trim() || "Unknown Church");
+    setChurchName(activeChurchName ?? churchSettings?.church_name?.trim() ?? "Unknown Church");
     setSettings(churchSettings);
     setConnection(planningCenterConnection);
+    await refreshWorkspace();
     setLoading(false);
-  }, []);
+  }, [activeChurchName, churchId, refreshWorkspace]);
 
   useEffect(() => {
     let active = true;
@@ -73,8 +71,18 @@ export default function SettingsPage() {
   return (
     <PageShell>
       <section className="grid gap-4 xl:grid-cols-2">
-        <PlanningCenterConnectionPanel connection={connection} churchName={churchName} loading={loading} />
-        <SyncStatusPanel connection={connection} loading={loading} onSyncComplete={loadSettings} />
+        <PlanningCenterConnectionPanel
+          churchId={churchId}
+          connection={connection}
+          churchName={churchName}
+          loading={loading}
+        />
+        <SyncStatusPanel
+          churchId={churchId}
+          connection={connection}
+          loading={loading}
+          onSyncComplete={loadSettings}
+        />
       </section>
 
       <section>
@@ -97,8 +105,8 @@ export default function SettingsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm leading-6 text-muted-foreground">
-            This frontend reads live churches, members, attendance, risk scores, settings, and integration
-            connection data using the public Supabase client. No write operations are executed from this UI.
+            This workspace reads live churches, members, attendance, risk scores, settings, and integration
+            connection data scoped to the authenticated church. Editable settings are saved only for this workspace.
           </CardContent>
         </Card>
 

@@ -1,7 +1,9 @@
+import os
 from datetime import datetime, timezone
 
 from data.schema import (
     Attendance,
+    Church,
     IntegrationToken,
     Member,
     SessionLocal,
@@ -9,6 +11,40 @@ from data.schema import (
     init_db,
 )
 from utils.planning_center import get_people, get_checkins
+
+
+def _active_church_id_from_env():
+    raw_church_id = os.getenv("SHEPHERD_ACTIVE_CHURCH_ID")
+    if not raw_church_id:
+        return None
+
+    try:
+        church_id = int(raw_church_id)
+    except ValueError as error:
+        raise RuntimeError(
+            f"Invalid SHEPHERD_ACTIVE_CHURCH_ID={raw_church_id!r}."
+        ) from error
+
+    if church_id <= 0:
+        raise RuntimeError(
+            f"Invalid SHEPHERD_ACTIVE_CHURCH_ID={raw_church_id!r}."
+        )
+
+    return church_id
+
+
+def _get_active_church_id(db):
+    env_church_id = _active_church_id_from_env()
+    if env_church_id is not None:
+        church = db.query(Church).filter(Church.id == env_church_id).first()
+        if church is None:
+            raise RuntimeError(f"Active church not found for church_id={env_church_id}.")
+        print(f"Active church_id: {env_church_id}")
+        return env_church_id
+
+    default_church = get_or_create_default_church(db)
+    print(f"Active church_id: {default_church.id}")
+    return default_church.id
 
 
 def parse_pco_datetime(timestamp):
@@ -34,6 +70,7 @@ def parse_pco_datetime(timestamp):
 
 
 def _get_or_create_planning_center_token(db, church_id):
+    authenticated_sync = _active_church_id_from_env() is not None
     token = (
         db.query(IntegrationToken)
         .filter(
@@ -42,7 +79,7 @@ def _get_or_create_planning_center_token(db, church_id):
         )
         .first()
     )
-    if token is None:
+    if token is None and not authenticated_sync:
         token = (
             db.query(IntegrationToken)
             .filter(
@@ -51,7 +88,7 @@ def _get_or_create_planning_center_token(db, church_id):
             )
             .first()
         )
-    if token is None:
+    if token is None and not authenticated_sync:
         token = (
             db.query(IntegrationToken)
             .filter(IntegrationToken.provider == "planning_center")
@@ -71,10 +108,11 @@ def _get_or_create_planning_center_token(db, church_id):
 def save_people():
     init_db()
     db = SessionLocal()
+    active_church_id = None
+    authenticated_sync = _active_church_id_from_env() is not None
 
     try:
-        active_church = get_or_create_default_church(db)
-        token = _get_or_create_planning_center_token(db, active_church.id)
+        active_church_id = _get_active_church_id(db)
 
         people = get_people(10)
         checkins = get_checkins(25)
@@ -98,12 +136,12 @@ def save_people():
             existing_member = (
                 db.query(Member)
                 .filter(
-                    Member.church_id == active_church.id,
+                    Member.church_id == active_church_id,
                     Member.pco_id == person["pco_id"],
                 )
                 .first()
             )
-            if existing_member is None:
+            if existing_member is None and not authenticated_sync:
                 existing_member = (
                     db.query(Member)
                     .filter(
@@ -114,7 +152,7 @@ def save_people():
                 )
 
             if existing_member:
-                existing_member.church_id = active_church.id
+                existing_member.church_id = active_church_id
                 existing_member.name = person["name"]
                 existing_member.email = person.get("email")
                 existing_member.status = person["status"]
@@ -122,7 +160,7 @@ def save_people():
             else:
                 db.add(
                     Member(
-                        church_id=active_church.id,
+                        church_id=active_church_id,
                         pco_id=person["pco_id"],
                         name=person["name"],
                         email=person.get("email"),
@@ -143,12 +181,12 @@ def save_people():
             existing_checkin = (
                 db.query(Attendance)
                 .filter(
-                    Attendance.church_id == active_church.id,
+                    Attendance.church_id == active_church_id,
                     Attendance.pco_checkin_id == pco_checkin_id,
                 )
                 .first()
             )
-            if existing_checkin is None:
+            if existing_checkin is None and not authenticated_sync:
                 existing_checkin = (
                     db.query(Attendance)
                     .filter(
@@ -159,12 +197,12 @@ def save_people():
                 )
 
             if existing_checkin:
-                existing_checkin.church_id = active_church.id
+                existing_checkin.church_id = active_church_id
                 continue
 
             db.add(
                 Attendance(
-                    church_id=active_church.id,
+                    church_id=active_church_id,
                     pco_checkin_id=pco_checkin_id,
                     member_pco_id=checkin.get("member_pco_id"),
                     attended_at=parse_pco_datetime(checkin.get("attended_at")),
@@ -173,6 +211,7 @@ def save_people():
             )
             saved_attendance_count += 1
 
+        token = _get_or_create_planning_center_token(db, active_church_id)
         token.connection_status = "connected"
         token.last_sync_at = datetime.utcnow()
         token.members_imported = saved_members_count
@@ -189,11 +228,12 @@ def save_people():
     except Exception:
         db.rollback()
         try:
-            active_church = get_or_create_default_church(db)
-            token = _get_or_create_planning_center_token(db, active_church.id)
-            token.connection_status = "error"
-            token.updated_at = datetime.utcnow()
-            db.commit()
+            fallback_church_id = active_church_id or _get_active_church_id(db)
+            token = _get_or_create_planning_center_token(db, fallback_church_id)
+            if token is not None:
+                token.connection_status = "error"
+                token.updated_at = datetime.utcnow()
+                db.commit()
         except Exception:
             db.rollback()
         raise

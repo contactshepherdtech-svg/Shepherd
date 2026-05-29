@@ -1,17 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Mail, PhoneCall } from "lucide-react";
+import { ArrowRight, BellOff, CheckCircle2, Mail } from "lucide-react";
 
 import { RiskBadge } from "@/components/risk-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { MemberDirectoryRow } from "@/lib/data";
+import { upsertOutreachStatus, type MemberDirectoryRow } from "@/lib/data";
 import { formatDate } from "@/lib/format";
 
 type PriorityOutreachCardProps = {
   row: MemberDirectoryRow;
+  churchId: number;
+  onStatusChange: () => void;
 };
 
 const recommendedActionByTier = {
@@ -21,9 +24,65 @@ const recommendedActionByTier = {
   Critical: "Pastor follow-up",
 } as const;
 
-export function PriorityOutreachCard({ row }: PriorityOutreachCardProps) {
+type ActionState = "idle" | "loading" | "success";
+
+export function PriorityOutreachCard({ row, churchId, onStatusChange }: PriorityOutreachCardProps) {
+  const [actionState, setActionState] = useState<ActionState>("idle");
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const recommendedAction = row.risk.tier ? recommendedActionByTier[row.risk.tier] : "No action available";
-  const memberProfileHref = `/members?member=${encodeURIComponent(row.member.pco_id || row.member.id)}`;
+  const memberId = encodeURIComponent(row.member.pco_id || row.member.id);
+  const memberProfileHref = `/members?member=${memberId}`;
+  const draftEmailHref = `/members?member=${memberId}&action=email`;
+  const memberPcoId = row.member.pco_id;
+  const isLoading = actionState === "loading";
+
+  const handleAction = async (
+    action: () => Promise<void>,
+    successMessage: string,
+  ) => {
+    if (!memberPcoId) return;
+    setActionState("loading");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      await action();
+      setActionMessage(successMessage);
+      setActionState("success");
+      // Let the success message show briefly before parent re-filters
+      setTimeout(() => {
+        onStatusChange();
+      }, 900);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Action failed. Please try again.";
+      setActionError(msg);
+      setActionState("idle");
+    }
+  };
+
+  const onMarkContacted = () =>
+    handleAction(
+      () =>
+        upsertOutreachStatus(churchId, memberPcoId!, {
+          status: "contacted",
+          contacted_at: new Date().toISOString(),
+        }),
+      "Marked as contacted.",
+    );
+
+  const onSnooze = (days: number) =>
+    handleAction(
+      () => {
+        const until = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+        return upsertOutreachStatus(churchId, memberPcoId!, {
+          status: "snoozed",
+          snoozed_until: until,
+        });
+      },
+      `Snoozed for ${days} days.`,
+    );
 
   return (
     <motion.div whileHover={{ y: -2 }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -64,15 +123,59 @@ export function PriorityOutreachCard({ row }: PriorityOutreachCardProps) {
             </p>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Button variant="secondary" className="justify-start gap-2">
-              <Mail className="size-4" />
-              Draft Email
+          <div>
+            <Button variant="secondary" asChild className="justify-start gap-2">
+              <Link href={draftEmailHref}>
+                <Mail className="size-4" />
+                Draft Email
+              </Link>
             </Button>
-            <Button variant="secondary" className="justify-start gap-2">
-              <PhoneCall className="size-4" />
-              Schedule Call
-            </Button>
+          </div>
+
+          {/* Outreach workflow actions */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Outreach Actions
+            </p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void onMarkContacted()}
+                disabled={isLoading || actionState === "success" || !memberPcoId}
+                className="justify-start gap-1.5"
+              >
+                <CheckCircle2 className="size-3.5" />
+                {isLoading ? "Saving..." : "Mark Contacted"}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void onSnooze(7)}
+                disabled={isLoading || actionState === "success" || !memberPcoId}
+                className="justify-start gap-1.5"
+              >
+                <BellOff className="size-3.5" />
+                Snooze 7 Days
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void onSnooze(30)}
+                disabled={isLoading || actionState === "success" || !memberPcoId}
+                className="justify-start gap-1.5"
+              >
+                <BellOff className="size-3.5" />
+                Snooze 30 Days
+              </Button>
+            </div>
+
+            {actionMessage ? (
+              <p className="text-xs font-medium text-primary">{actionMessage}</p>
+            ) : null}
+            {actionError ? (
+              <p className="text-xs text-red-600">{actionError}</p>
+            ) : null}
           </div>
 
           <Button asChild className="w-full justify-between">

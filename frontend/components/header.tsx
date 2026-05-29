@@ -5,12 +5,8 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { CalendarDays, CheckCircle2, Clock3, Unplug } from "lucide-react";
 
-import {
-  getDefaultChurch,
-  getPlanningCenterConnection,
-  isPlanningCenterConnected,
-  type PlanningCenterConnection,
-} from "@/lib/data";
+import { useAuth } from "@/lib/auth-context";
+import { isPlanningCenterConnected } from "@/lib/data";
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
@@ -60,44 +56,11 @@ const routeMeta: Record<string, { title: string; subtitle: string }> = {
 export function Header() {
   const pathname = usePathname();
   const meta = routeMeta[pathname] ?? routeMeta["/dashboard"];
-  const [churchName, setChurchName] = useState("Unknown Church");
-  const [connection, setConnection] = useState<PlanningCenterConnection | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { churchName, planningCenterConnection: connection, loading } = useAuth();
   const [todayLabel, setTodayLabel] = useState("—");
 
   useEffect(() => {
     setTodayLabel(formatDeterministicDay(new Date()));
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadConnection = async () => {
-      setLoading(true);
-
-      const church = await getDefaultChurch();
-      if (!church) {
-        if (active) {
-          setChurchName("Unknown Church");
-          setConnection(null);
-          setLoading(false);
-        }
-        return;
-      }
-
-      const planningCenterConnection = await getPlanningCenterConnection(church.id);
-      if (active) {
-        setChurchName(church.name?.trim() || "Unknown Church");
-        setConnection(planningCenterConnection);
-        setLoading(false);
-      }
-    };
-
-    void loadConnection();
-
-    return () => {
-      active = false;
-    };
   }, []);
 
   const lastSyncLabel = useMemo(() => {
@@ -123,7 +86,7 @@ export function Header() {
         className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"
       >
         <div>
-          <p className="shepherd-kicker">{churchName}</p>
+          <p className="shepherd-kicker">{churchName ?? "Unknown Church"}</p>
           <h1 className="mt-1 font-heading text-2xl font-semibold text-foreground">{meta.title}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{meta.subtitle}</p>
         </div>

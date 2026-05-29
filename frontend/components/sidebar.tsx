@@ -2,12 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Gauge, Users, Siren, Settings } from "lucide-react";
+import { Gauge, LogOut, Settings, Siren, Users } from "lucide-react";
 
-import { getDefaultChurch } from "@/lib/data";
+import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -35,24 +34,13 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [churchName, setChurchName] = useState("Unknown Church");
+  const router = useRouter();
+  const { churchName, user, signOut } = useAuth();
 
-  useEffect(() => {
-    let active = true;
-
-    const loadChurch = async () => {
-      const church = await getDefaultChurch();
-      if (active) {
-        setChurchName(church?.name?.trim() || "Unknown Church");
-      }
-    };
-
-    void loadChurch();
-
-    return () => {
-      active = false;
-    };
-  }, []);
+  const handleSignOut = async () => {
+    await signOut();
+    router.replace("/login");
+  };
 
   return (
     <aside className="sticky top-0 hidden h-screen w-[266px] shrink-0 border-r border-[#064736] bg-sidebar text-sidebar-foreground lg:block">
@@ -114,9 +102,25 @@ export function Sidebar() {
           })}
         </nav>
 
-        <div className="mt-auto rounded-xl border border-[#2C8B70]/40 bg-[#0A6A52]/45 p-3">
-          <p className="text-[11px] uppercase tracking-[0.13em] text-[#C6D9CF]">Workspace</p>
-          <p className="mt-1 text-sm font-semibold text-[#F8F6EA]">{churchName}</p>
+        <div className="mt-auto space-y-2">
+          <div className="rounded-xl border border-[#2C8B70]/40 bg-[#0A6A52]/45 p-3">
+            <p className="text-[11px] uppercase tracking-[0.13em] text-[#C6D9CF]">Workspace</p>
+            <p className="mt-1 text-sm font-semibold text-[#F8F6EA]">
+              {churchName ?? "Loading…"}
+            </p>
+            {user?.email ? (
+              <p className="mt-0.5 truncate text-[11px] text-[#A8C2B5]">{user.email}</p>
+            ) : null}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void handleSignOut()}
+            className="flex w-full items-center gap-2.5 rounded-lg border border-[#2C8B70]/30 px-3 py-2 text-sm text-[#C6D9CF] transition-colors hover:border-[#2C8B70]/60 hover:bg-[#0A6A52]/45 hover:text-[#F8F6EA]"
+          >
+            <LogOut className="size-4 shrink-0" />
+            <span className="font-medium">Sign out</span>
+          </button>
         </div>
       </div>
     </aside>

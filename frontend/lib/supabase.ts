@@ -11,6 +11,21 @@ export type Database = {
           created_at: string | null;
           updated_at: string | null;
         };
+        Insert: {
+          id?: number;
+          name?: string | null;
+          planning_center_org_id?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          name?: string | null;
+          planning_center_org_id?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
       };
       members: {
         Row: {
@@ -119,6 +134,97 @@ export type Database = {
           created_at: string | null;
           updated_at: string | null;
         };
+        Insert: {
+          id?: number;
+          church_id?: number | null;
+          provider?: string | null;
+          access_token?: string | null;
+          refresh_token?: string | null;
+          expires_at?: string | null;
+          scope?: string | null;
+          connection_status?: string | null;
+          last_sync_at?: string | null;
+          members_imported?: number | null;
+          attendance_imported?: number | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          church_id?: number | null;
+          provider?: string | null;
+          access_token?: string | null;
+          refresh_token?: string | null;
+          expires_at?: string | null;
+          scope?: string | null;
+          connection_status?: string | null;
+          last_sync_at?: string | null;
+          members_imported?: number | null;
+          attendance_imported?: number | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+      church_users: {
+        Row: {
+          id: number;
+          user_id: string;
+          church_id: number;
+          role: string;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          user_id: string;
+          church_id: number;
+          role?: string;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          user_id?: string;
+          church_id?: number;
+          role?: string;
+          created_at?: string | null;
+        };
+        Relationships: [];
+      };
+      outreach_status: {
+        Row: {
+          id: number;
+          church_id: number | null;
+          member_pco_id: string;
+          status: string;
+          contacted_at: string | null;
+          snoozed_until: string | null;
+          notes: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          church_id?: number | null;
+          member_pco_id: string;
+          status?: string;
+          contacted_at?: string | null;
+          snoozed_until?: string | null;
+          notes?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          church_id?: number | null;
+          member_pco_id?: string;
+          status?: string;
+          contacted_at?: string | null;
+          snoozed_until?: string | null;
+          notes?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
       };
     };
   };
@@ -139,8 +245,8 @@ export function getSupabaseClient(): SupabaseClient<Database> | null {
   if (!cachedClient) {
     cachedClient = createClient<Database>(supabaseUrl!, supabaseAnonKey!, {
       auth: {
-        persistSession: false,
-        autoRefreshToken: false,
+        persistSession: true,
+        autoRefreshToken: true,
       },
     });
   }

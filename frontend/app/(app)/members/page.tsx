@@ -13,24 +13,29 @@ import { Input } from "@/components/ui/input";
 import {
   buildMemberDirectoryRows,
   getAttendance,
-  getDefaultChurch,
   getMembers,
   getRiskScores,
   type MemberDirectoryRow,
   type RiskTier,
 } from "@/lib/data";
+import { useAuth } from "@/lib/auth-context";
 
 const tierOptions: Array<"All" | RiskTier> = ["All", "Healthy", "Watch", "At Risk", "Critical"];
 
 function MembersContent() {
+  const { churchId } = useAuth();
   const searchParams = useSearchParams();
   const memberParam = searchParams.get("member");
+  const actionParam = searchParams.get("action");
   const [query, setQuery] = useState("");
   const [tierFilter, setTierFilter] = useState<(typeof tierOptions)[number]>("All");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [allMembersCount, setAllMembersCount] = useState(0);
   const [memberRows, setMemberRows] = useState<MemberDirectoryRow[]>([]);
+  const [pendingAction, setPendingAction] = useState<"email" | null>(
+    actionParam === "email" ? "email" : null,
+  );
 
   useEffect(() => {
     let active = true;
@@ -38,8 +43,7 @@ function MembersContent() {
     const loadMembers = async () => {
       setLoading(true);
 
-      const church = await getDefaultChurch();
-      if (!church) {
+      if (!churchId) {
         if (active) {
           setAllMembersCount(0);
           setMemberRows([]);
@@ -49,9 +53,9 @@ function MembersContent() {
       }
 
       const [members, attendance, riskScores] = await Promise.all([
-        getMembers(church.id),
-        getAttendance(church.id),
-        getRiskScores(church.id),
+        getMembers(churchId),
+        getAttendance(churchId),
+        getRiskScores(churchId),
       ]);
 
       if (active) {
@@ -66,7 +70,7 @@ function MembersContent() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [churchId]);
 
   useEffect(() => {
     if (!memberRows.length || selectedId) {
@@ -183,7 +187,14 @@ function MembersContent() {
         </Card>
 
         <div className="space-y-4">
-          {selectedMember ? <MemberDetailPanel row={selectedMember} /> : null}
+          {selectedMember ? (
+            <MemberDetailPanel
+              row={selectedMember}
+              churchId={churchId}
+              autoGenerateEmail={pendingAction === "email"}
+              onAutoEmailTriggered={() => setPendingAction(null)}
+            />
+          ) : null}
           {!selectedMember ? (
             <Card>
               <CardContent className="p-8 text-center">

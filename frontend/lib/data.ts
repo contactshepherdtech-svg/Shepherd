@@ -2,18 +2,25 @@ import type { Database } from "@/lib/supabase";
 import { supabase } from "@/lib/supabase";
 
 type ChurchRow = Database["public"]["Tables"]["churches"]["Row"];
+type ChurchInsert = Database["public"]["Tables"]["churches"]["Insert"];
+type ChurchUserRow = Database["public"]["Tables"]["church_users"]["Row"];
+type ChurchUserInsert = Database["public"]["Tables"]["church_users"]["Insert"];
 type MemberRow = Database["public"]["Tables"]["members"]["Row"];
 type AttendanceRow = Database["public"]["Tables"]["attendance"]["Row"];
 type RiskScoreRow = Database["public"]["Tables"]["risk_scores"]["Row"];
 type ChurchSettingsRow = Database["public"]["Tables"]["church_settings"]["Row"];
+type ChurchSettingsInsert = Database["public"]["Tables"]["church_settings"]["Insert"];
 type ChurchSettingsUpdate = Database["public"]["Tables"]["church_settings"]["Update"];
 type IntegrationTokenRow = Database["public"]["Tables"]["integration_tokens"]["Row"];
+type OutreachStatusRow = Database["public"]["Tables"]["outreach_status"]["Row"];
 
 export type ChurchRecord = ChurchRow;
+export type ChurchUserRecord = ChurchUserRow;
 export type MemberRecord = MemberRow;
 export type AttendanceRecord = AttendanceRow;
 export type RiskScoreRecord = RiskScoreRow;
 export type ChurchSettingsRecord = ChurchSettingsRow;
+export type OutreachStatusRecord = OutreachStatusRow;
 export type EditableChurchSettings = Pick<
   ChurchSettingsRow,
   | "church_name"
@@ -70,6 +77,15 @@ export type EngagementOverview = {
 
 export type PlanningCenterConnection = IntegrationTokenRecord;
 
+export type OnboardingWorkspaceInput = {
+  church_name: string;
+  main_service_frequency: string;
+  watch_missed_services: number;
+  at_risk_missed_services: number;
+  critical_missed_services: number;
+  preferred_followup_style: string;
+};
+
 function hasClient() {
   return Boolean(supabase);
 }
@@ -122,29 +138,123 @@ function getDaysSince(date: Date | null): number | null {
   return Math.max(Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24)), 0);
 }
 
-export async function getDefaultChurch(): Promise<ChurchRow | null> {
+export async function getChurch(churchId: number): Promise<ChurchRow | null> {
   const client = requireSupabaseClient();
 
-  const singleQuery = await client
+  const { data, error } = await client
     .from("churches")
     .select("*")
-    .limit(1)
+    .eq("id", churchId)
+    .limit(1);
+
+  if (error) {
+    logQueryError("churches", error);
+    throw error;
+  }
+
+  return data?.[0] ?? null;
+}
+
+export async function getChurchUserForUser(userId: string): Promise<ChurchUserRow | null> {
+  const client = requireSupabaseClient();
+
+  const { data, error } = await client
+    .from("church_users")
+    .select("*")
+    .eq("user_id", userId)
+    .limit(1);
+
+  if (error) {
+    logQueryError("church_users", error);
+    throw error;
+  }
+
+  return data?.[0] ?? null;
+}
+
+export async function getChurchForUser(
+  userId: string,
+): Promise<{ churchUser: ChurchUserRow; church: ChurchRow } | null> {
+  const churchUser = await getChurchUserForUser(userId);
+  if (!churchUser) return null;
+
+  const church = await getChurch(churchUser.church_id);
+  if (!church) return null;
+
+  return { churchUser, church };
+}
+
+export async function createChurchWorkspace(
+  userId: string,
+  values: OnboardingWorkspaceInput,
+): Promise<{ church: ChurchRow; churchUser: ChurchUserRow; settings: ChurchSettingsRow }> {
+  const client = requireSupabaseClient();
+  const now = new Date().toISOString();
+  const churchName = values.church_name.trim();
+
+  const churchPayload: ChurchInsert = {
+    name: churchName,
+    created_at: now,
+    updated_at: now,
+  };
+
+  const { data: churchData, error: churchError } = await client
+    .from("churches")
+    .insert([churchPayload] as never[])
+    .select("*")
     .single();
 
-  if (!singleQuery.error) {
-    return singleQuery.data;
+  if (churchError) {
+    logQueryError("churches", churchError);
+    throw churchError;
   }
 
-  logQueryError("churches", singleQuery.error);
+  const church = churchData as ChurchRow;
+  const settingsPayload: ChurchSettingsInsert = {
+    church_id: church.id,
+    church_name: churchName,
+    main_service_frequency: values.main_service_frequency,
+    watch_missed_services: values.watch_missed_services,
+    at_risk_missed_services: values.at_risk_missed_services,
+    critical_missed_services: values.critical_missed_services,
+    preferred_followup_style: values.preferred_followup_style,
+    created_at: now,
+    updated_at: now,
+  };
 
-  const fallbackQuery = await client.from("churches").select("*").limit(1);
+  const { data: settingsData, error: settingsError } = await client
+    .from("church_settings")
+    .insert(settingsPayload as never)
+    .select("*")
+    .single();
 
-  if (fallbackQuery.error) {
-    logQueryError("churches", fallbackQuery.error);
-    throw fallbackQuery.error;
+  if (settingsError) {
+    logQueryError("church_settings", settingsError);
+    throw settingsError;
   }
 
-  return fallbackQuery.data?.[0] ?? null;
+  const settings = settingsData as ChurchSettingsRow;
+  const churchUserPayload: ChurchUserInsert = {
+    user_id: userId,
+    church_id: church.id,
+    role: "admin",
+    created_at: now,
+  };
+
+  const { data: churchUserData, error: churchUserError } = await client
+    .from("church_users")
+    .insert(churchUserPayload as never)
+    .select("*")
+    .single();
+
+  if (churchUserError) {
+    logQueryError("church_users", churchUserError);
+    throw churchUserError;
+  }
+
+  const churchUser = churchUserData as ChurchUserRow;
+
+  return { church, churchUser, settings };
 }
 
 export async function getMembers(churchId: number): Promise<MemberRow[]> {
@@ -271,7 +381,8 @@ export function isPlanningCenterConnected(connection: PlanningCenterConnection |
   return Boolean(
     connection &&
       connection.connection_status === "connected" &&
-      connection.provider === "planning_center",
+      connection.provider === "planning_center" &&
+      connection.access_token,
   );
 }
 
@@ -421,3 +532,81 @@ export function getPriorityOutreachRows(memberRows: MemberDirectoryRow[]): Membe
     .sort((left, right) => (right.risk.score ?? -1) - (left.risk.score ?? -1));
 }
 
+export async function getOutreachStatuses(churchId: number): Promise<OutreachStatusRecord[]> {
+  const client = requireSupabaseClient();
+
+  const { data, error } = await client
+    .from("outreach_status")
+    .select("*")
+    .eq("church_id", churchId);
+
+  if (error) {
+    logQueryError("outreach_status", error);
+    return [];
+  }
+
+  return data ?? [];
+}
+
+export async function upsertOutreachStatus(
+  churchId: number,
+  memberPcoId: string,
+  update: {
+    status: "active" | "contacted" | "snoozed";
+    contacted_at?: string | null;
+    snoozed_until?: string | null;
+  },
+): Promise<void> {
+  const client = requireSupabaseClient();
+  const now = new Date().toISOString();
+
+  const payload = {
+    church_id: churchId,
+    member_pco_id: memberPcoId,
+    status: update.status,
+    contacted_at: update.contacted_at ?? null,
+    snoozed_until: update.snoozed_until ?? null,
+    updated_at: now,
+  };
+
+  const { data: existingRaw } = await client
+    .from("outreach_status")
+    .select("*")
+    .eq("church_id", churchId)
+    .eq("member_pco_id", memberPcoId)
+    .limit(1);
+
+  const existing = existingRaw as Array<{ id: number }> | null;
+
+  if (existing && existing.length > 0) {
+    const { error } = await client
+      .from("outreach_status")
+      .update(payload as never)
+      .eq("id", existing[0].id);
+    if (error) throw error;
+  } else {
+    const { error } = await client
+      .from("outreach_status")
+      .insert({ ...payload, created_at: now } as never);
+    if (error) throw error;
+  }
+}
+
+export function isVisibleInQueue(memberPcoId: string | null, statuses: OutreachStatusRecord[]): boolean {
+  if (!memberPcoId) return true;
+  const status = statuses.find((s) => s.member_pco_id === memberPcoId);
+  if (!status) return true;
+  if (status.status === "contacted") return false;
+  if (status.status === "snoozed" && status.snoozed_until) {
+    return new Date(status.snoozed_until) <= new Date();
+  }
+  return true;
+}
+
+export function getOutreachStatusForMember(
+  memberPcoId: string | null,
+  statuses: OutreachStatusRecord[],
+): OutreachStatusRecord | null {
+  if (!memberPcoId) return null;
+  return statuses.find((s) => s.member_pco_id === memberPcoId) ?? null;
+}
