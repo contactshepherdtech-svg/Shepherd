@@ -1,0 +1,114 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --font-sans: var(--font-inter);
+  --font-heading: var(--font-plus-jakarta);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --background: #f4f0d8;
+  --foreground: #1d2b24;
+  --card: #fffdf6;
+  --card-foreground: #1d2b24;
+  --popover: #fffdf6;
+  --popover-foreground: #1d2b24;
+  --primary: #006b55;
+  --primary-foreground: #f8f6ea;
+  --secondary: #ebe4c5;
+  --secondary-foreground: #244136;
+  --muted: #f0ead0;
+  --muted-foreground: #4a5a52;
+  --accent: #ffd21f;
+  --accent-foreground: #1d2b24;
+  --border: rgba(11, 95, 74, 0.12);
+  --input: rgba(11, 95, 74, 0.1);
+  --ring: rgba(0, 107, 85, 0.4);
+  --sidebar: #0b5f4a;
+  --sidebar-foreground: #f8f6ea;
+  --radius: 14px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html,
+  body {
+    @apply min-h-full;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-plus-jakarta), var(--font-inter), system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  .shepherd-surface {
+    @apply rounded-xl border bg-card shadow-[0_8px_22px_rgba(11,95,74,0.08)] transition-all;
+  }
+
+  .shepherd-kicker {
+    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground;
+  }
+
+  .shepherd-title {
+    @apply text-[15px] font-semibold text-foreground;
+  }
+
+  .shepherd-subtitle {
+    @apply text-sm leading-6 text-muted-foreground;
+  }
+
+  .shepherd-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .shepherd-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(11, 95, 74, 0.24);
+    border-radius: 999px;
+  }
+
+  .shepherd-scrollbar::-webkit-scrollbar-track {
+    background: rgba(11, 95, 74, 0.08);
+  }
+}
