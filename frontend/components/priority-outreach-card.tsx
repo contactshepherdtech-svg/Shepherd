@@ -24,7 +24,7 @@ export function PriorityOutreachCard({ row }: PriorityOutreachCardProps) {
               <CardTitle>{row.member.name}</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">{row.member.email || "No email on file"}</p>
             </div>
-            <RiskBadge tier={row.risk.tier} />
+            {row.risk.tier ? <RiskBadge tier={row.risk.tier} /> : null}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -35,7 +35,7 @@ export function PriorityOutreachCard({ row }: PriorityOutreachCardProps) {
 
           <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
             <p>
-              <span className="font-medium text-foreground">Risk Score:</span> {row.risk.score}
+              <span className="font-medium text-foreground">Risk Score:</span> {row.risk.score ?? "No score"}
             </p>
             <p>
               <span className="font-medium text-foreground">Last Attended:</span> {formatDate(row.last_attended)}

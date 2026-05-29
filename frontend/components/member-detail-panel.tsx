@@ -37,6 +37,8 @@ const tierPlainEnglishMap: Record<string, string> = {
     "This member has sustained disengagement indicators and likely needs direct leadership outreach this week.",
 };
 
+const missingRiskExplanation = "No risk score available for this member yet.";
+
 type MemberDetailPanelProps = {
   row: MemberDirectoryRow;
 };
@@ -121,7 +123,7 @@ export function MemberDetailPanel({ row }: MemberDetailPanelProps) {
   );
 
   const recentAttendance = row.attendance_history.slice(0, 6);
-  const recommendedAction = tierActionMap[row.risk.tier] ?? "Friendly check-in";
+  const recommendedAction = row.risk.tier ? tierActionMap[row.risk.tier] : "No action available until scoring runs";
 
   const onGenerateEmail = () => {
     setOutreachDraft(buildEmailTemplate(row));
@@ -168,9 +170,15 @@ export function MemberDetailPanel({ row }: MemberDetailPanelProps) {
               <span className="rounded-full border border-border/80 bg-[#EFE6C7] px-2.5 py-1 text-xs font-medium text-foreground">
                 {row.member.status}
               </span>
-              <RiskBadge tier={row.risk.tier} />
+              {row.risk.tier ? (
+                <RiskBadge tier={row.risk.tier} />
+              ) : (
+                <span className="rounded-full border border-border/80 bg-[#EFE6C7] px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                  No risk score available
+                </span>
+              )}
               <span className="rounded-full border border-border/80 bg-[#EFE6C7] px-2.5 py-1 text-xs font-semibold text-foreground">
-                Risk {row.risk.score}
+                Risk {row.risk.score ?? "not scored"}
               </span>
               <span className="rounded-full border border-border/80 bg-[#EFE6C7] px-2.5 py-1 text-xs font-medium text-muted-foreground">
                 Last attended {formatDate(row.last_attended)}
@@ -183,18 +191,24 @@ export function MemberDetailPanel({ row }: MemberDetailPanelProps) {
       <Card>
         <CardHeader>
           <p className="shepherd-kicker">Risk Analysis</p>
-          <CardTitle>Why this member is in {row.risk.tier}</CardTitle>
+          <CardTitle>{row.risk.tier ? `Why this member is in ${row.risk.tier}` : "No risk score available"}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-lg border border-border/80 bg-[#F2EBD0] p-3">
               <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Risk score</p>
-              <p className="mt-1 font-heading text-2xl font-semibold">{row.risk.score}</p>
+              <p className="mt-1 font-heading text-2xl font-semibold">{row.risk.score ?? "No score"}</p>
             </div>
             <div className="rounded-lg border border-border/80 bg-[#F2EBD0] p-3">
               <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Tier</p>
               <div className="mt-1">
-                <RiskBadge tier={row.risk.tier} />
+                {row.risk.tier ? (
+                  <RiskBadge tier={row.risk.tier} />
+                ) : (
+                  <span className="rounded-full border border-border/80 bg-[#F8F2DA] px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                    No risk score available
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -215,7 +229,9 @@ export function MemberDetailPanel({ row }: MemberDetailPanelProps) {
               <Sparkles className="size-4 text-primary" />
               Plain-English explanation
             </p>
-            <p className="mt-2 text-muted-foreground">{tierPlainEnglishMap[row.risk.tier]}</p>
+            <p className="mt-2 text-muted-foreground">
+              {row.risk.tier ? tierPlainEnglishMap[row.risk.tier] : missingRiskExplanation}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -237,24 +253,31 @@ export function MemberDetailPanel({ row }: MemberDetailPanelProps) {
             </div>
           </div>
 
-          <div className="rounded-lg border border-border/80 bg-card p-4">
-            <div className="flex items-end gap-2">
-              {attendanceBuckets.map((bucket) => (
-                <div key={bucket.label} className="flex flex-1 flex-col items-center gap-2">
-                  <div className="flex h-24 w-full items-end rounded-md bg-[#EFE6C6] p-1">
-                    <div
-                      className="w-full rounded-sm bg-primary"
-                      style={{
-                        height: `${Math.max(8, bucket.count * 18)}px`,
-                        opacity: bucket.count ? 0.9 : 0.25,
-                      }}
-                    />
+          {row.attendance_history.length ? (
+            <div className="rounded-lg border border-border/80 bg-card p-4">
+              <div className="flex items-end gap-2">
+                {attendanceBuckets.map((bucket) => (
+                  <div key={bucket.label} className="flex flex-1 flex-col items-center gap-2">
+                    <div className="flex h-24 w-full items-end rounded-md bg-[#EFE6C6] p-1">
+                      <div
+                        className="w-full rounded-sm bg-primary"
+                        style={{
+                          height: `${Math.max(8, bucket.count * 18)}px`,
+                          opacity: bucket.count ? 0.9 : 0.25,
+                        }}
+                      />
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">{bucket.label}</span>
                   </div>
-                  <span className="text-[11px] text-muted-foreground">{bucket.label}</span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border bg-[#F8F2DA] p-6 text-center">
+              <p className="text-sm font-semibold text-foreground">No attendance history</p>
+              <p className="mt-1 text-sm text-muted-foreground">Attendance records will appear here after sync.</p>
+            </div>
+          )}
 
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
@@ -271,7 +294,7 @@ export function MemberDetailPanel({ row }: MemberDetailPanelProps) {
                   </span>
                 ))
               ) : (
-                <span className="text-sm text-muted-foreground">No recent attendance dates.</span>
+                <span className="text-sm text-muted-foreground">No attendance history</span>
               )}
             </div>
           </div>

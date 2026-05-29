@@ -6,6 +6,7 @@ import { CalendarClock, ChevronRight, Mail } from "lucide-react";
 import { RiskBadge } from "@/components/risk-badge";
 import { Button } from "@/components/ui/button";
 import type { MemberDirectoryRow } from "@/lib/data";
+import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type MemberCardProps = {
@@ -29,19 +30,26 @@ export function MemberCard({ row, selected, onSelect }: MemberCardProps) {
           <p className="mt-0.5 text-xs text-muted-foreground">{row.member.ministry}</p>
         </div>
         <span className="rounded-md bg-[#EDE4C4] px-2 py-1 text-xs font-semibold text-foreground">
-          {row.risk.score}
+          {row.risk.score ?? "No score"}
         </span>
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
-        <RiskBadge tier={row.risk.tier} />
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {row.risk.tier ? (
+          <RiskBadge tier={row.risk.tier} />
+        ) : (
+          <span className="rounded-full border border-border/80 bg-[#F8F2DA] px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+            No risk score available
+          </span>
+        )}
         <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-[#F3ECD2] px-2.5 py-1 text-xs text-muted-foreground">
           <CalendarClock className="size-3.5" />
-          {row.days_since_last_attendance ?? "—"}d
+          {row.last_attended ? formatDate(row.last_attended) : "No attendance history"}
         </span>
       </div>
 
       <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+        <p>{row.member.status}</p>
         <p className="inline-flex items-center gap-1.5">
           <Mail className="size-3.5" />
           {row.member.email || "No email on file"}

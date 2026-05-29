@@ -145,7 +145,7 @@ export default function PriorityPage() {
                   className="flex items-center justify-between rounded-lg border border-border/80 bg-[#F8F2DA] p-2"
                 >
                   <span className="text-sm font-medium text-foreground">{row.member.name}</span>
-                  <RiskBadge tier={row.risk.tier} />
+                  {row.risk.tier ? <RiskBadge tier={row.risk.tier} /> : null}
                 </div>
               ))}
               {!filteredQueue.length ? (

@@ -29,8 +29,8 @@ export type MemberDirectoryRow = {
   };
   risk: {
     member_id: string;
-    score: number;
-    tier: RiskTier;
+    score: number | null;
+    tier: RiskTier | null;
     reasons: string[];
     updated_at: string | null;
   };
@@ -258,12 +258,10 @@ export function buildMemberDirectoryRows(
   }, new Map());
 
   const rows = members.reduce<MemberDirectoryRow[]>((acc, member) => {
-    if (!member.pco_id) return acc;
+    const memberId = member.pco_id || String(member.id);
+    const memberRisk = member.pco_id ? riskByMemberPcoId.get(member.pco_id) : undefined;
 
-    const memberRisk = riskByMemberPcoId.get(member.pco_id);
-    if (!memberRisk) return acc;
-
-    const attendanceHistory = [...(attendanceByMemberPcoId.get(member.pco_id) ?? [])].sort(
+    const attendanceHistory = [...(member.pco_id ? attendanceByMemberPcoId.get(member.pco_id) ?? [] : [])].sort(
       (left, right) => right.getTime() - left.getTime(),
     );
 
@@ -271,7 +269,7 @@ export function buildMemberDirectoryRows(
 
     acc.push({
       member: {
-        id: member.pco_id,
+        id: memberId,
         pco_id: member.pco_id,
         name: member.name?.trim() || "Unknown member",
         email: member.email?.trim() || "",
@@ -280,11 +278,11 @@ export function buildMemberDirectoryRows(
         ministry: "General Ministry",
       },
       risk: {
-        member_id: memberRisk.member_pco_id || member.pco_id,
-        score: memberRisk.score ?? 0,
-        tier: normalizeTier(memberRisk.tier),
-        reasons: parseReasons(memberRisk.reasons),
-        updated_at: memberRisk.updated_at,
+        member_id: memberRisk?.member_pco_id || memberId,
+        score: memberRisk?.score ?? null,
+        tier: memberRisk ? normalizeTier(memberRisk.tier) : null,
+        reasons: parseReasons(memberRisk?.reasons),
+        updated_at: memberRisk?.updated_at ?? null,
       },
       attendance_history: attendanceHistory,
       attendance_count: attendanceHistory.length,
@@ -295,7 +293,7 @@ export function buildMemberDirectoryRows(
     return acc;
   }, []);
 
-  return rows.sort((left, right) => right.risk.score - left.risk.score);
+  return rows.sort((left, right) => (right.risk.score ?? -1) - (left.risk.score ?? -1));
 }
 
 export function getRiskDistribution(riskScores: RiskScoreRow[]): RiskDistributionItem[] {
@@ -380,5 +378,5 @@ export function getEngagementOverview(memberRows: MemberDirectoryRow[]): Engagem
 export function getPriorityOutreachRows(memberRows: MemberDirectoryRow[]): MemberDirectoryRow[] {
   return memberRows
     .filter((row) => row.risk.tier === "Watch" || row.risk.tier === "At Risk" || row.risk.tier === "Critical")
-    .sort((left, right) => right.risk.score - left.risk.score);
+    .sort((left, right) => (right.risk.score ?? -1) - (left.risk.score ?? -1));
 }

@@ -27,7 +27,6 @@ export default function MembersPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [allMembersCount, setAllMembersCount] = useState(0);
-  const [riskScoreCount, setRiskScoreCount] = useState(0);
   const [memberRows, setMemberRows] = useState<MemberDirectoryRow[]>([]);
 
   useEffect(() => {
@@ -40,7 +39,6 @@ export default function MembersPage() {
       if (!church) {
         if (active) {
           setAllMembersCount(0);
-          setRiskScoreCount(0);
           setMemberRows([]);
           setLoading(false);
         }
@@ -55,7 +53,6 @@ export default function MembersPage() {
 
       if (active) {
         setAllMembersCount(members.length);
-        setRiskScoreCount(riskScores.length);
         setMemberRows(buildMemberDirectoryRows(members, riskScores, attendance));
         setLoading(false);
       }
@@ -149,11 +146,6 @@ export default function MembersPage() {
                   <p className="text-sm font-medium text-foreground">No members found.</p>
                   <p className="mt-1 text-sm text-muted-foreground">Sync your directory to populate this list.</p>
                 </div>
-              ) : !riskScoreCount ? (
-                <div className="rounded-lg border border-dashed border-border bg-[#F8F2DA] p-6 text-center">
-                  <p className="text-sm font-medium text-foreground">No risk scores found.</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Run risk scoring to unlock Member 360 profiles.</p>
-                </div>
               ) : (
                 filteredRows.map((row) => (
                   <MemberCard
@@ -165,7 +157,7 @@ export default function MembersPage() {
                 ))
               )}
 
-              {allMembersCount > 0 && riskScoreCount > 0 && !filteredRows.length ? (
+              {allMembersCount > 0 && !filteredRows.length ? (
                 <div className="rounded-lg border border-dashed border-border bg-[#F8F2DA] p-6 text-center">
                   <p className="text-sm font-medium text-foreground">No members match your search.</p>
                   <p className="mt-1 text-sm text-muted-foreground">Try a different keyword or tier filter.</p>
@@ -189,7 +181,12 @@ export default function MembersPage() {
             <span className="rounded-full border border-border/80 bg-[#EEE5C6] px-2.5 py-1 text-xs font-semibold text-foreground">
               {filteredRows.length}
             </span>
-            {selectedMember ? <RiskBadge tier={selectedMember.risk.tier} /> : null}
+            {selectedMember?.risk.tier ? <RiskBadge tier={selectedMember.risk.tier} /> : null}
+            {selectedMember && !selectedMember.risk.tier ? (
+              <span className="rounded-full border border-border/80 bg-[#EEE5C6] px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                No risk score available
+              </span>
+            ) : null}
           </div>
         </div>
       </section>
