@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, Mail, PhoneCall } from "lucide-react";
 
@@ -13,7 +14,17 @@ type PriorityOutreachCardProps = {
   row: MemberDirectoryRow;
 };
 
+const recommendedActionByTier = {
+  Healthy: "No action needed",
+  Watch: "Friendly check-in",
+  "At Risk": "Personal email or call",
+  Critical: "Pastor follow-up",
+} as const;
+
 export function PriorityOutreachCard({ row }: PriorityOutreachCardProps) {
+  const recommendedAction = row.risk.tier ? recommendedActionByTier[row.risk.tier] : "No action available";
+  const memberProfileHref = `/members?member=${encodeURIComponent(row.member.pco_id || row.member.id)}`;
+
   return (
     <motion.div whileHover={{ y: -2 }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
       <Card>
@@ -30,7 +41,15 @@ export function PriorityOutreachCard({ row }: PriorityOutreachCardProps) {
         <CardContent className="space-y-4">
           <div className="rounded-lg border border-border/80 bg-[#F8F2DA] p-3">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Why now</p>
-            <p className="mt-1 text-sm text-foreground">{row.risk.reasons[0] || "No risk context available yet."}</p>
+            {row.risk.reasons.length ? (
+              <ul className="mt-1 space-y-1 text-sm text-foreground">
+                {row.risk.reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-sm text-foreground">No risk context available yet.</p>
+            )}
           </div>
 
           <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
@@ -39,6 +58,9 @@ export function PriorityOutreachCard({ row }: PriorityOutreachCardProps) {
             </p>
             <p>
               <span className="font-medium text-foreground">Last Attended:</span> {formatDate(row.last_attended)}
+            </p>
+            <p>
+              <span className="font-medium text-foreground">Recommended:</span> {recommendedAction}
             </p>
           </div>
 
@@ -53,9 +75,11 @@ export function PriorityOutreachCard({ row }: PriorityOutreachCardProps) {
             </Button>
           </div>
 
-          <Button className="w-full justify-between">
-            Open Member 360
-            <ArrowRight className="size-4" />
+          <Button asChild className="w-full justify-between">
+            <Link href={memberProfileHref}>
+              Open Member 360
+              <ArrowRight className="size-4" />
+            </Link>
           </Button>
         </CardContent>
       </Card>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Filter, Search } from "lucide-react";
 
 import { MemberCard } from "@/components/member-card";
@@ -21,7 +22,9 @@ import {
 
 const tierOptions: Array<"All" | RiskTier> = ["All", "Healthy", "Watch", "At Risk", "Critical"];
 
-export default function MembersPage() {
+function MembersContent() {
+  const searchParams = useSearchParams();
+  const memberParam = searchParams.get("member");
   const [query, setQuery] = useState("");
   const [tierFilter, setTierFilter] = useState<(typeof tierOptions)[number]>("All");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -64,6 +67,18 @@ export default function MembersPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!memberRows.length || selectedId) {
+      return;
+    }
+
+    const matchingMember = memberParam
+      ? memberRows.find((row) => row.member.pco_id === memberParam || row.member.id === memberParam)
+      : null;
+
+    setSelectedId((matchingMember ?? memberRows[0]).member.id);
+  }, [memberParam, memberRows, selectedId]);
 
   const filteredRows = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -191,5 +206,21 @@ export default function MembersPage() {
         </div>
       </section>
     </PageShell>
+  );
+}
+
+export default function MembersPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageShell>
+          <Card>
+            <CardContent className="p-6 text-sm text-muted-foreground">Loading data...</CardContent>
+          </Card>
+        </PageShell>
+      }
+    >
+      <MembersContent />
+    </Suspense>
   );
 }

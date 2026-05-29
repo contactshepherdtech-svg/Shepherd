@@ -19,7 +19,7 @@ import {
   type RiskTier,
 } from "@/lib/data";
 
-const tiers: Array<"All" | RiskTier> = ["All", "Watch", "At Risk", "Critical", "Healthy"];
+const tiers: Array<"All" | RiskTier> = ["All", "Watch", "At Risk", "Critical"];
 
 export default function PriorityPage() {
   const [tier, setTier] = useState<(typeof tiers)[number]>("All");
