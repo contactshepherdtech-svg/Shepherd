@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Database, HeartHandshake } from "lucide-react";
-
 import {
   ChurchSettingsPanel,
+  ConnectionChecklistPanel,
   GmailConnectionPanel,
   PlanningCenterConnectionPanel,
   SyncStatusPanel,
@@ -15,6 +15,8 @@ import {
   getChurchSettings,
   getGmailConnection,
   getPlanningCenterConnection,
+  isGmailConnected,
+  isPlanningCenterConnected,
   type ChurchSettingsRecord,
   type GmailConnection,
   type PlanningCenterConnection,
@@ -61,9 +63,7 @@ export default function SettingsPage() {
       try {
         await loadSettings();
       } finally {
-        if (!active) {
-          return;
-        }
+        if (!active) return;
       }
     };
 
@@ -74,32 +74,60 @@ export default function SettingsPage() {
     };
   }, [loadSettings]);
 
+  const pcConnected = isPlanningCenterConnected(connection);
+  const gmailConn = isGmailConnected(gmailConnection);
+  const hasSynced = Boolean(connection?.last_sync_at);
+
   return (
     <PageShell>
-      <section className="grid gap-4 xl:grid-cols-2">
-        <PlanningCenterConnectionPanel
-          churchId={churchId}
-          connection={connection}
-          churchName={churchName}
-          loading={loading}
-        />
-        <SyncStatusPanel
-          churchId={churchId}
-          connection={connection}
-          loading={loading}
-          onSyncComplete={loadSettings}
-        />
+      {/* Connection checklist — full width at top */}
+      <ConnectionChecklistPanel
+        planningCenterConnected={pcConnected}
+        gmailConnected={gmailConn}
+        hasSynced={hasSynced}
+        loading={loading}
+      />
+
+      <section className="space-y-3">
+        <div>
+          <p className="shepherd-kicker">Integrations</p>
+          <h2 className="font-heading text-lg font-semibold tracking-[-0.03em]">Connected services</h2>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-2">
+          <PlanningCenterConnectionPanel
+            churchId={churchId}
+            connection={connection}
+            churchName={churchName}
+            loading={loading}
+          />
+          <GmailConnectionPanel
+            churchId={churchId}
+            connection={gmailConnection}
+            loading={loading}
+          />
+        </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-2">
-        <GmailConnectionPanel
-          churchId={churchId}
-          connection={gmailConnection}
-          loading={loading}
-        />
+      <section className="space-y-3">
+        <div>
+          <p className="shepherd-kicker">Sync</p>
+          <h2 className="font-heading text-lg font-semibold tracking-[-0.03em]">Planning Center import status</h2>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-2">
+          <SyncStatusPanel
+            churchId={churchId}
+            connection={connection}
+            loading={loading}
+            onSyncComplete={loadSettings}
+          />
+        </div>
       </section>
 
-      <section>
+      <section className="space-y-3">
+        <div>
+          <p className="shepherd-kicker">Church Configuration</p>
+          <h2 className="font-heading text-lg font-semibold tracking-[-0.03em]">Engagement thresholds</h2>
+        </div>
         <ChurchSettingsPanel
           churchId={churchId}
           churchName={churchName}
@@ -109,34 +137,40 @@ export default function SettingsPage() {
         />
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <p className="shepherd-kicker">Data Readiness</p>
-            <CardTitle className="inline-flex items-center gap-2">
-              <Database className="size-4 text-primary" />
-              Read-only Supabase Scope
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm leading-6 text-muted-foreground">
-            This workspace reads live churches, members, attendance, risk scores, settings, and integration
-            connection data scoped to the authenticated church. Editable settings are saved only for this workspace.
-          </CardContent>
-        </Card>
+      <section className="space-y-3">
+        <div>
+          <p className="shepherd-kicker">AI Outreach</p>
+          <h2 className="font-heading text-lg font-semibold tracking-[-0.03em]">Operational guidance</h2>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-2">
+          <Card className="shepherd-elevate">
+            <CardHeader>
+              <p className="shepherd-kicker">Data Readiness</p>
+              <CardTitle className="inline-flex items-center gap-2 text-[15px]">
+                <Database className="size-4 text-primary" />
+                Read-only Supabase Scope
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm leading-6 text-muted-foreground">
+              This workspace reads live churches, members, attendance, risk scores, settings, and integration
+              connection data scoped to the authenticated church. Editable settings are saved only for this workspace.
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <p className="shepherd-kicker">Care Operations</p>
-            <CardTitle className="inline-flex items-center gap-2">
-              <HeartHandshake className="size-4 text-primary" />
-              Follow-up Guidelines
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm leading-6 text-muted-foreground">
-            Keep communications warm and personal. Route critical members to pastoral follow-up,
-            and use watch-tier check-ins to reconnect members before disengagement deepens.
-          </CardContent>
-        </Card>
+          <Card className="shepherd-elevate">
+            <CardHeader>
+              <p className="shepherd-kicker">Care Operations</p>
+              <CardTitle className="inline-flex items-center gap-2 text-[15px]">
+                <HeartHandshake className="size-4 text-primary" />
+                Follow-up Guidelines
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm leading-6 text-muted-foreground">
+              Keep communications warm and personal. Route critical members to pastoral follow-up,
+              and use watch-tier check-ins to reconnect members before disengagement deepens.
+            </CardContent>
+          </Card>
+        </div>
       </section>
     </PageShell>
   );

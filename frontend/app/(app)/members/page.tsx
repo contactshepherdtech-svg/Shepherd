@@ -114,9 +114,9 @@ function MembersContent() {
 
   return (
     <PageShell>
-      <section className="grid gap-4 xl:grid-cols-[360px_1fr]">
-        <Card className="xl:h-[calc(100vh-185px)] xl:overflow-hidden">
-          <CardHeader>
+      <section className="grid gap-4 xl:grid-cols-[400px_1fr]">
+        <Card className="xl:h-[calc(100vh-178px)] xl:overflow-hidden">
+          <CardHeader className="border-b border-border bg-white/92 backdrop-blur">
             <p className="shepherd-kicker">Members</p>
             <CardTitle>Searchable congregation list</CardTitle>
           </CardHeader>
@@ -128,7 +128,7 @@ function MembersContent() {
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search by name or email"
-                  className="pl-9"
+                  className="pl-9 transition-all focus-visible:shadow-[0_0_0_4px_rgba(0,107,85,0.08)]"
                 />
               </div>
 
@@ -147,8 +147,8 @@ function MembersContent() {
                         onClick={() => setTierFilter(tier)}
                         className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
                           active
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border bg-card text-muted-foreground hover:border-primary/40"
+                        ? "border-primary bg-primary text-primary-foreground shadow-[0_8px_18px_rgba(0,107,85,0.16)]"
+                            : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:bg-[#FAFBFA]"
                         }`}
                       >
                         {tier}
@@ -159,9 +159,9 @@ function MembersContent() {
               </div>
             </div>
 
-            <div className="shepherd-scrollbar space-y-3 pr-1 xl:max-h-[calc(100%-118px)] xl:overflow-y-auto">
+            <div className="shepherd-scrollbar space-y-2.5 pr-1 xl:max-h-[calc(100%-118px)] xl:overflow-y-auto">
               {!allMembersCount ? (
-                <div className="rounded-lg border border-dashed border-border bg-[#F8F2DA] p-6 text-center">
+                <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-6 text-center">
                   <p className="text-sm font-medium text-foreground">No members found.</p>
                   <p className="mt-1 text-sm text-muted-foreground">Sync your directory to populate this list.</p>
                 </div>
@@ -177,7 +177,7 @@ function MembersContent() {
               )}
 
               {allMembersCount > 0 && !filteredRows.length ? (
-                <div className="rounded-lg border border-dashed border-border bg-[#F8F2DA] p-6 text-center">
+                <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-6 text-center">
                   <p className="text-sm font-medium text-foreground">No members match your search.</p>
                   <p className="mt-1 text-sm text-muted-foreground">Try a different keyword or tier filter.</p>
                 </div>
@@ -204,12 +204,12 @@ function MembersContent() {
           ) : null}
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">Visible members:</span>
-            <span className="rounded-full border border-border/80 bg-[#EEE5C6] px-2.5 py-1 text-xs font-semibold text-foreground">
+            <span className="rounded-full border border-border/80 bg-[#F3F5F4] px-2.5 py-1 text-xs font-semibold text-foreground">
               {filteredRows.length}
             </span>
             {selectedMember?.risk.tier ? <RiskBadge tier={selectedMember.risk.tier} /> : null}
             {selectedMember && !selectedMember.risk.tier ? (
-              <span className="rounded-full border border-border/80 bg-[#EEE5C6] px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+              <span className="rounded-full border border-border/80 bg-[#F3F5F4] px-2.5 py-1 text-xs font-semibold text-muted-foreground">
                 No risk score available
               </span>
             ) : null}

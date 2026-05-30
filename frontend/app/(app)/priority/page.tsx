@@ -108,15 +108,15 @@ export default function PriorityPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-border/80 bg-[#F8F2DA] p-3">
+              <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3">
                 <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Total</p>
                 <p className="mt-1 text-2xl font-semibold">{filteredQueue.length}</p>
               </div>
-              <div className="rounded-lg border border-border/80 bg-[#F8F2DA] p-3">
+              <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3">
                 <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Critical</p>
                 <p className="mt-1 text-2xl font-semibold">{urgentCount}</p>
               </div>
-              <div className="rounded-lg border border-border/80 bg-[#F8F2DA] p-3">
+              <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3">
                 <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Ready</p>
                 <p className="mt-1 text-2xl font-semibold">{filteredQueue.length - urgentCount}</p>
               </div>
@@ -159,14 +159,14 @@ export default function PriorityPage() {
               {filteredQueue.slice(0, 3).map((row) => (
                 <div
                   key={row.member.id}
-                  className="flex items-center justify-between rounded-lg border border-border/80 bg-[#F8F2DA] p-2"
+                  className="flex items-center justify-between rounded-lg border border-border/80 bg-[#FAFBFA] p-2"
                 >
                   <span className="text-sm font-medium text-foreground">{row.member.name}</span>
                   {row.risk.tier ? <RiskBadge tier={row.risk.tier} /> : null}
                 </div>
               ))}
               {!filteredQueue.length ? (
-                <div className="rounded-lg border border-dashed border-border bg-[#F8F2DA] p-4 text-sm text-muted-foreground">
+                <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-4 text-sm text-muted-foreground">
                   No risk scores found.
                 </div>
               ) : null}

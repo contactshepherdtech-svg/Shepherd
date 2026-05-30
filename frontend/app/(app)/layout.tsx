@@ -10,11 +10,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     <AuthProvider>
       <AuthGuard>
         <div className="min-h-screen bg-background">
-          <div className="mx-auto flex min-h-screen max-w-[1600px]">
+          <div className="flex min-h-screen">
             <Sidebar />
-            <div className="flex min-h-screen flex-1 flex-col">
+            <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden bg-background">
               <Header />
-              <main className="flex-1 p-6 md:p-8">{children}</main>
+              <main className="flex-1 px-5 py-6 md:px-8 lg:px-10">
+                <div className="mx-auto max-w-[1320px]">{children}</div>
+              </main>
             </div>
           </div>
         </div>

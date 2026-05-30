@@ -85,8 +85,15 @@ export function PriorityOutreachCard({ row, churchId, onStatusChange }: Priority
     );
 
   return (
-    <motion.div whileHover={{ y: -2 }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-      <Card>
+    <motion.div
+      layout
+      whileHover={{ y: -3 }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <Card className="relative overflow-hidden transition-all duration-200 hover:border-primary/16 hover:shadow-[0_18px_44px_rgba(17,24,39,0.10)]">
+        <div className="absolute inset-y-0 left-0 w-1 bg-primary" />
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -98,7 +105,7 @@ export function PriorityOutreachCard({ row, churchId, onStatusChange }: Priority
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-lg border border-border/80 bg-[#F8F2DA] p-3">
+          <div className="rounded-xl border border-border bg-[#FAFBFA] p-3">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Why now</p>
             {row.risk.reasons.length ? (
               <ul className="mt-1 space-y-1 text-sm text-foreground">
@@ -127,7 +134,7 @@ export function PriorityOutreachCard({ row, churchId, onStatusChange }: Priority
             <Button variant="secondary" asChild className="justify-start gap-2">
               <Link href={draftEmailHref}>
                 <Mail className="size-4" />
-                Draft Email
+                AI Draft Email
               </Link>
             </Button>
           </div>

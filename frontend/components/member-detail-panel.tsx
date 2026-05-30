@@ -304,9 +304,11 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35 }}
+      key={row.member.id}
+      layout
+      initial={{ opacity: 0, x: 18 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
       className="space-y-4"
     >
       <Card>
@@ -319,20 +321,20 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
               {row.member.email || "No email on file"}
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-border/80 bg-[#EFE6C7] px-2.5 py-1 text-xs font-medium text-foreground">
+              <span className="rounded-full border border-border/80 bg-[#F3F5F4] px-2.5 py-1 text-xs font-medium text-foreground">
                 {row.member.status}
               </span>
               {row.risk.tier ? (
                 <RiskBadge tier={row.risk.tier} />
               ) : (
-                <span className="rounded-full border border-border/80 bg-[#EFE6C7] px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                <span className="rounded-full border border-border/80 bg-[#F3F5F4] px-2.5 py-1 text-xs font-semibold text-muted-foreground">
                   No risk score available
                 </span>
               )}
-              <span className="rounded-full border border-border/80 bg-[#EFE6C7] px-2.5 py-1 text-xs font-semibold text-foreground">
+              <span className="rounded-full border border-border/80 bg-[#F3F5F4] px-2.5 py-1 text-xs font-semibold text-foreground">
                 Risk {row.risk.score ?? "not scored"}
               </span>
-              <span className="rounded-full border border-border/80 bg-[#EFE6C7] px-2.5 py-1 text-xs font-medium text-muted-foreground">
+              <span className="rounded-full border border-border/80 bg-[#F3F5F4] px-2.5 py-1 text-xs font-medium text-muted-foreground">
                 Last attended {formatDate(row.last_attended)}
               </span>
             </div>
@@ -347,24 +349,24 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-border/80 bg-[#F2EBD0] p-3">
+            <div className="rounded-lg border border-border/80 bg-[#F7F8F7] p-3">
               <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Risk score</p>
               <p className="mt-1 font-heading text-2xl font-semibold">{row.risk.score ?? "No score"}</p>
             </div>
-            <div className="rounded-lg border border-border/80 bg-[#F2EBD0] p-3">
+            <div className="rounded-lg border border-border/80 bg-[#F7F8F7] p-3">
               <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Tier</p>
               <div className="mt-1">
                 {row.risk.tier ? (
                   <RiskBadge tier={row.risk.tier} />
                 ) : (
-                  <span className="rounded-full border border-border/80 bg-[#F8F2DA] px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                  <span className="rounded-full border border-border/80 bg-[#FAFBFA] px-2.5 py-1 text-xs font-semibold text-muted-foreground">
                     No risk score available
                   </span>
                 )}
               </div>
             </div>
           </div>
-          <div className="rounded-lg border border-border/80 bg-[#F8F2DA] p-4">
+          <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Reasons</p>
             {row.risk.reasons.length ? (
               <ul className="mt-2 space-y-1 text-sm text-foreground">
@@ -395,11 +397,11 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-border/80 bg-[#F2EBD0] p-3">
+            <div className="rounded-lg border border-border/80 bg-[#F7F8F7] p-3">
               <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Total attendance</p>
               <p className="mt-1 font-heading text-2xl font-semibold">{row.attendance_count}</p>
             </div>
-            <div className="rounded-lg border border-border/80 bg-[#F2EBD0] p-3">
+            <div className="rounded-lg border border-border/80 bg-[#F7F8F7] p-3">
               <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Last attended</p>
               <p className="mt-1 text-sm font-semibold text-foreground">{formatDate(row.last_attended)}</p>
             </div>
@@ -410,7 +412,7 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
               <div className="flex items-end gap-2">
                 {attendanceBuckets.map((bucket) => (
                   <div key={bucket.label} className="flex flex-1 flex-col items-center gap-2">
-                    <div className="flex h-24 w-full items-end rounded-md bg-[#EFE6C6] p-1">
+                    <div className="flex h-24 w-full items-end rounded-md bg-[#F3F5F4] p-1">
                       <div
                         className="w-full rounded-sm bg-primary"
                         style={{
@@ -425,7 +427,7 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
               </div>
             </div>
           ) : (
-            <div className="rounded-lg border border-dashed border-border bg-[#F8F2DA] p-6 text-center">
+            <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-6 text-center">
               <p className="text-sm font-semibold text-foreground">No attendance history</p>
               <p className="mt-1 text-sm text-muted-foreground">Attendance records will appear here after sync.</p>
             </div>
@@ -440,7 +442,7 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
                 recentAttendance.map((date) => (
                   <span
                     key={date.toISOString()}
-                    className="rounded-full border border-border/80 bg-[#F2EBD0] px-2.5 py-1 text-xs text-foreground"
+                    className="rounded-full border border-border/80 bg-[#F7F8F7] px-2.5 py-1 text-xs text-foreground"
                   >
                     {formatDate(date)}
                   </span>
@@ -460,15 +462,15 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
             <CardTitle>Current engagement snapshot</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <div className="flex items-center justify-between rounded-lg border border-border/80 bg-[#F8F2DA] px-3 py-2">
+            <div className="flex items-center justify-between rounded-lg border border-border/80 bg-[#FAFBFA] px-3 py-2">
               <span className="text-muted-foreground">Attendance count</span>
               <span className="font-semibold">{row.attendance_count}</span>
             </div>
-            <div className="flex items-center justify-between rounded-lg border border-border/80 bg-[#F8F2DA] px-3 py-2">
+            <div className="flex items-center justify-between rounded-lg border border-border/80 bg-[#FAFBFA] px-3 py-2">
               <span className="text-muted-foreground">Days since last attendance</span>
               <span className="font-semibold">{formatRelativeDays(row.days_since_last_attendance)}</span>
             </div>
-            <div className="flex items-center justify-between rounded-lg border border-border/80 bg-[#F8F2DA] px-3 py-2">
+            <div className="flex items-center justify-between rounded-lg border border-border/80 bg-[#FAFBFA] px-3 py-2">
               <span className="text-muted-foreground">Attendance trend</span>
               <span className="font-semibold">{attendanceTrend}</span>
             </div>
@@ -488,7 +490,7 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
               </p>
               <p className="mt-2 text-sm text-foreground">{recommendedAction}</p>
             </div>
-            <div className="rounded-lg border border-border/80 bg-[#F8F2DA] p-4">
+            <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-4">
               <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Operational note</p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 Coordinate outreach through the member’s ministry lead to preserve relationship continuity.
@@ -506,7 +508,7 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
         <CardContent className="space-y-4">
           {/* Current outreach status badge */}
           {outreachStatus && outreachStatus.status !== "active" ? (
-            <div className="rounded-lg border border-border/80 bg-[#F8F2DA] p-3 text-sm">
+            <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3 text-sm">
               {outreachStatus.status === "contacted" ? (
                 <p className="inline-flex items-center gap-2 font-semibold text-primary">
                   <CheckCircle2 className="size-4" />
@@ -596,7 +598,7 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
             </Button>
           </div>
 
-          <div className="rounded-lg border border-border/80 bg-[#F8F2DA] p-4">
+          <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-4">
             <div className="mb-2 flex items-center justify-between">
               <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Activity className="size-4 text-primary" />

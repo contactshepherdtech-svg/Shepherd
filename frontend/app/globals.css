@@ -33,26 +33,26 @@
 }
 
 :root {
-  --background: #f4f0d8;
-  --foreground: #1d2b24;
-  --card: #fffdf6;
-  --card-foreground: #1d2b24;
-  --popover: #fffdf6;
-  --popover-foreground: #1d2b24;
+  --background: #ffffff;
+  --foreground: #111827;
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --popover: #ffffff;
+  --popover-foreground: #111827;
   --primary: #006b55;
-  --primary-foreground: #f8f6ea;
-  --secondary: #ebe4c5;
-  --secondary-foreground: #244136;
-  --muted: #f0ead0;
-  --muted-foreground: #4a5a52;
+  --primary-foreground: #ffffff;
+  --secondary: #f3f4f6;
+  --secondary-foreground: #111827;
+  --muted: #f9fafb;
+  --muted-foreground: #6b7280;
   --accent: #ffd21f;
-  --accent-foreground: #1d2b24;
-  --border: rgba(11, 95, 74, 0.12);
-  --input: rgba(11, 95, 74, 0.1);
+  --accent-foreground: #111827;
+  --border: rgba(0, 0, 0, 0.06);
+  --input: rgba(0, 0, 0, 0.08);
   --ring: rgba(0, 107, 85, 0.4);
-  --sidebar: #0b5f4a;
+  --sidebar: #0a5a47;
   --sidebar-foreground: #f8f6ea;
-  --radius: 14px;
+  --radius: 16px;
 }
 
 @layer base {
@@ -68,6 +68,7 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+    text-rendering: optimizeLegibility;
   }
 
   h1,
@@ -83,15 +84,15 @@
 
 @layer utilities {
   .shepherd-surface {
-    @apply rounded-xl border bg-card shadow-[0_8px_22px_rgba(11,95,74,0.08)] transition-all;
+    @apply rounded-2xl border bg-card shadow-[0_12px_35px_rgba(17,24,39,0.06)] transition-all;
   }
 
   .shepherd-kicker {
-    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground;
+    @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground;
   }
 
   .shepherd-title {
-    @apply text-[15px] font-semibold text-foreground;
+    @apply text-[15px] font-semibold tracking-[-0.01em] text-foreground;
   }
 
   .shepherd-subtitle {
@@ -104,11 +105,87 @@
   }
 
   .shepherd-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(11, 95, 74, 0.24);
+    background: rgba(0, 107, 85, 0.2);
     border-radius: 999px;
   }
 
   .shepherd-scrollbar::-webkit-scrollbar-track {
-    background: rgba(11, 95, 74, 0.08);
+    background: rgba(17, 24, 39, 0.04);
   }
+
+  .shepherd-soft-panel {
+    @apply rounded-xl border border-border bg-[#FAFBFA];
+  }
+
+  .shepherd-elevate {
+    @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(17,24,39,0.10)];
+  }
+
+  .shepherd-focus-ring {
+    @apply focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-primary/15 focus-visible:outline-none;
+  }
+
+  .shepherd-skeleton {
+    @apply relative overflow-hidden rounded-xl bg-[#F3F5F4];
+  }
+
+  .shepherd-skeleton::after {
+    position: absolute;
+    inset: 0;
+    content: "";
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), transparent);
+    animation: shepherd-shimmer 1.4s infinite;
+  }
+
+  @keyframes shepherd-shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+}
+
+/* Threshold slider */
+input[type="range"].shepherd-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+input[type="range"].shepherd-slider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input[type="range"].shepherd-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #006b55;
+  border: 2.5px solid white;
+  box-shadow: 0 6px 18px rgba(0, 107, 85, 0.22);
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+
+input[type="range"].shepherd-slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 8px 24px rgba(0, 107, 85, 0.28);
+  transform: scale(1.04);
+}
+
+input[type="range"].shepherd-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #006b55;
+  border: 2.5px solid white;
+  box-shadow: 0 6px 18px rgba(0, 107, 85, 0.22);
+  cursor: pointer;
 }

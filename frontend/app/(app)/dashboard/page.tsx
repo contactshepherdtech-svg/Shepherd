@@ -96,7 +96,7 @@ export default function DashboardPage() {
 
   return (
     <PageShell>
-      <section className="grid gap-4 xl:grid-cols-[1.1fr_1fr_1fr_1fr]">
+      <section className="grid gap-4 xl:grid-cols-[1.15fr_1fr_1fr_1fr]">
         <ChurchHealthGauge score={healthScore} />
         <MetricCard
           label="Total Members"
@@ -122,14 +122,14 @@ export default function DashboardPage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">
-        <Card>
+        <Card className="shepherd-elevate">
           <CardHeader>
             <p className="shepherd-kicker">Risk Distribution</p>
             <CardTitle>Member risk mix</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {!riskRows.length ? (
-              <p className="rounded-lg border border-dashed border-border bg-[#F8F2DA] p-4 text-sm text-muted-foreground">
+              <p className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-4 text-sm text-muted-foreground">
                 No risk scores found.
               </p>
             ) : null}
@@ -142,25 +142,28 @@ export default function DashboardPage() {
                   </div>
                   <span className="text-sm font-semibold text-foreground">{item.percent}%</span>
                 </div>
-                <div className="h-2 rounded-full bg-[#E8DFBF]">
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${item.percent}%` }} />
+                <div className="h-2 overflow-hidden rounded-full bg-[#E5E7EB]">
+                  <div
+                    className="h-full rounded-full bg-primary shadow-[0_0_16px_rgba(0,107,85,0.22)]"
+                    style={{ width: `${item.percent}%` }}
+                  />
                 </div>
               </div>
             ))}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shepherd-elevate">
           <CardHeader>
             <p className="shepherd-kicker">Attendance Trend</p>
             <CardTitle>Last 12 weeks</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid h-[180px] grid-cols-12 items-end gap-1.5 rounded-lg border border-border/80 bg-[#F8F2DA] p-3">
+            <div className="grid h-[168px] grid-cols-12 items-end gap-1.5 rounded-xl border border-border bg-[#FAFBFA] p-3">
               {attendanceTrend.map((point) => (
                 <div key={point.label} className="flex h-full flex-col justify-end gap-1">
                   <div
-                    className="rounded-sm bg-primary/90"
+                    className="rounded-md bg-primary/90 transition-all duration-200 hover:bg-primary"
                     style={{ height: `${Math.max(6, point.records * 12)}px` }}
                     title={`${point.label}: ${point.records} records`}
                   />
@@ -174,21 +177,21 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shepherd-elevate">
           <CardHeader>
             <p className="shepherd-kicker">Engagement Overview</p>
             <CardTitle>Current participation status</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="rounded-lg border border-border/80 bg-[#F8F2DA] p-3">
+            <div className="rounded-xl border border-border bg-[#FAFBFA] p-3">
               <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Active (0-14d)</p>
               <p className="mt-1 text-2xl font-semibold text-foreground">{engagementOverview.active}</p>
             </div>
-            <div className="rounded-lg border border-border/80 bg-[#F8F2DA] p-3">
+            <div className="rounded-xl border border-border bg-[#FAFBFA] p-3">
               <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Slipping (15-35d)</p>
               <p className="mt-1 text-2xl font-semibold text-foreground">{engagementOverview.slipping}</p>
             </div>
-            <div className="rounded-lg border border-border/80 bg-[#F8F2DA] p-3">
+            <div className="rounded-xl border border-border bg-[#FAFBFA] p-3">
               <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Disengaged (35d+)</p>
               <p className="mt-1 text-2xl font-semibold text-foreground">{engagementOverview.disengaged}</p>
             </div>
@@ -197,14 +200,14 @@ export default function DashboardPage() {
       </section>
 
       <section>
-        <Card>
+        <Card className="shepherd-elevate">
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="shepherd-kicker">Priority Outreach Queue</p>
                 <CardTitle>Members needing timely follow-up</CardTitle>
               </div>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-[#F0E7C7] px-3 py-1 text-xs font-medium text-foreground">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-[#F3F5F4] px-3 py-1 text-xs font-medium text-foreground">
                 <Activity className="size-3.5 text-primary" />
                 {priorityRows.length} queued
               </span>
@@ -212,11 +215,11 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {!memberRows.length ? (
-              <div className="rounded-lg border border-dashed border-border bg-[#F8F2DA] p-6 text-center text-sm text-muted-foreground">
+              <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-6 text-center text-sm text-muted-foreground">
                 No members found.
               </div>
             ) : !riskRows.length ? (
-              <div className="rounded-lg border border-dashed border-border bg-[#F8F2DA] p-6 text-center text-sm text-muted-foreground">
+              <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-6 text-center text-sm text-muted-foreground">
                 No risk scores found.
               </div>
             ) : (

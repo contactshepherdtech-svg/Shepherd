@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { CalendarDays, CheckCircle2, Clock3, Unplug } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, RefreshCcw, Unplug, UserCircle2 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-context";
 import { isPlanningCenterConnected } from "@/lib/data";
@@ -56,7 +56,7 @@ const routeMeta: Record<string, { title: string; subtitle: string }> = {
 export function Header() {
   const pathname = usePathname();
   const meta = routeMeta[pathname] ?? routeMeta["/dashboard"];
-  const { churchName, planningCenterConnection: connection, loading } = useAuth();
+  const { churchName, planningCenterConnection: connection, loading, user } = useAuth();
   const [todayLabel, setTodayLabel] = useState("—");
 
   useEffect(() => {
@@ -78,39 +78,56 @@ export function Header() {
     : "Not connected";
 
   return (
-    <header className="border-b border-border/70 bg-background/95 px-6 py-5 backdrop-blur md:px-8">
+    <header className="sticky top-0 z-20 border-b border-border bg-white/88 px-5 py-4 backdrop-blur-xl md:px-8 lg:px-10">
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.32 }}
+        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
         className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"
       >
         <div>
-          <p className="shepherd-kicker">{churchName ?? "Unknown Church"}</p>
-          <h1 className="mt-1 font-heading text-2xl font-semibold text-foreground">{meta.title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{meta.subtitle}</p>
+          <div className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_0_4px_rgba(0,107,85,0.10)]" />
+            <p className="shepherd-kicker">{churchName ?? "Unknown Church"}</p>
+          </div>
+          <h1 className="mt-1 font-heading text-[1.65rem] font-semibold tracking-[-0.035em] text-foreground">
+            {meta.title}
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{meta.subtitle}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/90 bg-card px-3 py-1.5 text-xs font-medium text-foreground">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors ${
+              loading
+                ? "border-border/80 bg-card text-muted-foreground"
+                : connected
+                  ? "border-primary/18 bg-primary/7 text-primary"
+                  : "border-border/80 bg-card text-muted-foreground"
+            }`}
+          >
             {loading ? (
-              <Clock3 className="size-3.5 text-primary" />
+              <Clock3 className="size-3.5 text-muted-foreground" />
             ) : connected ? (
-              <CheckCircle2 className="size-3.5 text-primary" />
+              <CheckCircle2 className="size-3.5" />
             ) : (
-              <Unplug className="size-3.5 text-primary" />
+              <Unplug className="size-3.5" />
             )}
-            {loading
-              ? "Loading data..."
-              : `Planning Center ${connectionStatusLabel}`}
+            {loading ? "Loading…" : `Planning Center ${connectionStatusLabel}`}
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/90 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
-            <Clock3 className="size-3.5 text-primary" />
-            Last Sync {lastSyncLabel}
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm">
+            <RefreshCcw className="size-3.5 text-primary/70" />
+            {lastSyncLabel}
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/90 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
-            <CalendarDays className="size-3.5 text-primary" />
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm">
+            <CalendarDays className="size-3.5 text-primary/70" />
             <span suppressHydrationWarning>{todayLabel}</span>
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card py-1 pl-1 pr-3 text-xs font-medium text-muted-foreground shadow-sm">
+            <span className="flex size-6 items-center justify-center rounded-full bg-[#F3F5F4] text-primary">
+              <UserCircle2 className="size-3.5" />
+            </span>
+            <span className="max-w-[160px] truncate">{user?.email ?? "Signed in"}</span>
           </span>
         </div>
       </motion.div>

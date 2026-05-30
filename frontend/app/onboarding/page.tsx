@@ -3,9 +3,9 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import type { OnboardingWorkspaceInput } from "@/lib/data";
@@ -19,6 +19,52 @@ const DEFAULT_FORM: OnboardingWorkspaceInput = {
   critical_missed_services: 6,
   preferred_followup_style: "soft and friendly",
 };
+
+const SLIDER_MAX = 12;
+
+type ThresholdSliderProps = {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  disabled?: boolean;
+  badgeColor: string;
+  helperText: string;
+};
+
+function ThresholdSlider({ label, value, onChange, disabled, badgeColor, helperText }: ThresholdSliderProps) {
+  const pct = Math.round((value / SLIDER_MAX) * 100);
+  return (
+    <div className="space-y-3 rounded-xl border border-border/80 bg-[#FAFBFA] p-4">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          {label}
+        </span>
+        <span
+          className={`min-w-[2.2rem] rounded-full px-2.5 py-0.5 text-center text-sm font-bold ${badgeColor}`}
+        >
+          {value}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={SLIDER_MAX}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        disabled={disabled}
+        className="shepherd-slider"
+        style={{
+          background: `linear-gradient(to right, #006b55 0%, #006b55 ${pct}%, rgba(11,95,74,0.14) ${pct}%)`,
+        }}
+      />
+      <div className="flex justify-between text-[11px] text-muted-foreground">
+        <span>0 missed</span>
+        <span className="text-center opacity-75">{helperText}</span>
+        <span>{SLIDER_MAX} missed</span>
+      </div>
+    </div>
+  );
+}
 
 function OnboardingContent() {
   const router = useRouter();
@@ -51,6 +97,33 @@ function OnboardingContent() {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
+  const setWatch = (v: number) => {
+    setForm((cur) => ({
+      ...cur,
+      watch_missed_services: v,
+      at_risk_missed_services: Math.max(cur.at_risk_missed_services, v + 1),
+      critical_missed_services: Math.max(cur.critical_missed_services, v + 2),
+    }));
+  };
+
+  const setAtRisk = (v: number) => {
+    setForm((cur) => ({
+      ...cur,
+      watch_missed_services: Math.min(cur.watch_missed_services, v - 1),
+      at_risk_missed_services: v,
+      critical_missed_services: Math.max(cur.critical_missed_services, v + 1),
+    }));
+  };
+
+  const setCritical = (v: number) => {
+    setForm((cur) => ({
+      ...cur,
+      watch_missed_services: Math.min(cur.watch_missed_services, v - 2),
+      at_risk_missed_services: Math.min(cur.at_risk_missed_services, v - 1),
+      critical_missed_services: v,
+    }));
+  };
+
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user || saving) return;
@@ -58,6 +131,15 @@ function OnboardingContent() {
     const churchName = form.church_name.trim();
     if (!churchName) {
       setError("Church name is required.");
+      return;
+    }
+
+    if (form.watch_missed_services >= form.at_risk_missed_services) {
+      setError("Watch threshold must be less than At Risk.");
+      return;
+    }
+    if (form.at_risk_missed_services >= form.critical_missed_services) {
+      setError("At Risk threshold must be less than Critical.");
       return;
     }
 
@@ -124,31 +206,56 @@ function OnboardingContent() {
   if (!user) return null;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
-      <div className="w-full max-w-2xl space-y-6">
-        <div className="flex justify-center">
-          <div className="relative overflow-hidden rounded-2xl border border-[#116a54] bg-[#095440] p-3 shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
+    <div className="relative flex min-h-screen items-start justify-center overflow-hidden bg-background px-4 py-10 sm:items-center">
+      {/* Radial background glow */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        aria-hidden
+        style={{
+          background:
+            "radial-gradient(ellipse 80% 60% at 50% 30%, rgba(0,107,85,0.08) 0%, transparent 70%)",
+        }}
+      />
+
+      <motion.div
+        initial={{ opacity: 0, y: 28 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 w-full max-w-xl space-y-7"
+      >
+        {/* Logo — no container */}
+        <div className="flex flex-col items-center gap-5">
+          <div style={{ filter: "drop-shadow(0 10px 28px rgba(0,107,85,0.28))" }}>
             <Image
               src="/shepherd-logo.png"
               alt="Shepherd"
-              width={96}
-              height={96}
-              className="h-auto w-[80px]"
+              width={380}
+              height={253}
+              className="h-auto w-[340px] max-w-full"
               priority
             />
           </div>
+          <div className="space-y-1 text-center">
+            <p className="shepherd-kicker">Step 1 of 3 · Workspace Setup</p>
+            <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
+              Create your church workspace
+            </h1>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Configure your engagement thresholds — you can adjust these any time in Settings.
+            </p>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <p className="shepherd-kicker">Workspace setup</p>
-            <CardTitle className="text-2xl">Create your church workspace</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              These settings define your default engagement thresholds before connecting Planning Center.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={(event) => void onSubmit(event)} className="space-y-4">
+        {/* Form card */}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+          className="rounded-2xl border border-border/60 bg-card/92 p-6 shadow-[0_24px_70px_rgba(17,24,39,0.10)] backdrop-blur-sm"
+        >
+          <form onSubmit={(event) => void onSubmit(event)} className="space-y-5">
+            {/* Church name + frequency row */}
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                   Church Name
@@ -164,88 +271,86 @@ function OnboardingContent() {
                 />
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    Main Service Frequency
-                  </label>
-                  <select
-                    value={form.main_service_frequency}
-                    onChange={(event) => updateField("main_service_frequency", event.target.value)}
-                    disabled={saving}
-                    className="flex h-10 w-full rounded-lg border border-border/90 bg-card px-3 py-2 text-sm text-foreground shadow-xs transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="weekly">Weekly</option>
-                    <option value="twice_weekly">Twice weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    Follow-up Style
-                  </label>
-                  <Input
-                    value={form.preferred_followup_style}
-                    onChange={(event) => updateField("preferred_followup_style", event.target.value)}
-                    placeholder="soft and friendly"
-                    disabled={saving}
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Service Frequency
+                </label>
+                <select
+                  value={form.main_service_frequency}
+                  onChange={(event) => updateField("main_service_frequency", event.target.value)}
+                  disabled={saving}
+                  className="flex h-10 w-full rounded-lg border border-border/90 bg-card px-3 py-2 text-sm text-foreground shadow-xs transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="weekly">Weekly</option>
+                  <option value="twice_weekly">Twice weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
               </div>
+            </div>
 
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="space-y-1.5 rounded-lg border border-border/80 bg-[#F8F2DA] p-3">
-                  <label className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    Watch
-                  </label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={form.watch_missed_services}
-                    onChange={(event) => updateField("watch_missed_services", Number(event.target.value))}
-                    disabled={saving}
-                  />
-                </div>
-                <div className="space-y-1.5 rounded-lg border border-border/80 bg-[#F8F2DA] p-3">
-                  <label className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    At Risk
-                  </label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={form.at_risk_missed_services}
-                    onChange={(event) => updateField("at_risk_missed_services", Number(event.target.value))}
-                    disabled={saving}
-                  />
-                </div>
-                <div className="space-y-1.5 rounded-lg border border-border/80 bg-[#F8F2DA] p-3">
-                  <label className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    Critical
-                  </label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={form.critical_missed_services}
-                    onChange={(event) => updateField("critical_missed_services", Number(event.target.value))}
-                    disabled={saving}
-                  />
-                </div>
+            {/* Threshold sliders */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                Engagement Thresholds
+              </p>
+              <p className="text-[12px] text-muted-foreground">
+                These control when a member is flagged as Watch, At Risk, or Critical based on missed services.
+              </p>
+              <div className="space-y-3 pt-1">
+                <ThresholdSlider
+                  label="Watch"
+                  value={form.watch_missed_services}
+                  onChange={setWatch}
+                  disabled={saving}
+                  badgeColor="bg-yellow-100 text-yellow-800"
+                  helperText="Early monitoring"
+                />
+                <ThresholdSlider
+                  label="At Risk"
+                  value={form.at_risk_missed_services}
+                  onChange={setAtRisk}
+                  disabled={saving}
+                  badgeColor="bg-orange-100 text-orange-800"
+                  helperText="Needs outreach"
+                />
+                <ThresholdSlider
+                  label="Critical"
+                  value={form.critical_missed_services}
+                  onChange={setCritical}
+                  disabled={saving}
+                  badgeColor="bg-red-100 text-red-800"
+                  helperText="Urgent follow-up"
+                />
               </div>
+            </div>
 
-              {error ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {error}
-                </div>
-              ) : null}
+            {/* Follow-up style */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                Follow-up Style
+              </label>
+              <Input
+                value={form.preferred_followup_style}
+                onChange={(event) => updateField("preferred_followup_style", event.target.value)}
+                placeholder="e.g. soft and friendly"
+                disabled={saving}
+              />
+            </div>
 
+            {error ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </div>
+            ) : null}
+
+            <motion.div whileTap={{ scale: 0.985 }}>
               <Button type="submit" className="w-full" disabled={saving}>
-                {saving ? "Creating workspace…" : "Create workspace"}
+                {saving ? "Creating workspace…" : "Continue to integrations →"}
               </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
+            </motion.div>
+          </form>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }
