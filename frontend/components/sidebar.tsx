@@ -20,6 +20,7 @@ import {
   PanelLeftOpen,
   Settings,
   Siren,
+  Sparkles,
   Users,
 } from "lucide-react";
 
@@ -27,6 +28,7 @@ import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 
 const navItems = [
+  { href: "/ask", label: "Ask", icon: Sparkles },
   { href: "/dashboard", label: "Dashboard", icon: Gauge },
   { href: "/members", label: "Members", icon: Users },
   { href: "/priority", label: "Priority", icon: Siren },
