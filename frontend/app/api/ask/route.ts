@@ -292,7 +292,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    return NextResponse.json({ success: true, source: "openrouter", model: usedModel, answer: content.trim() });
+    const answer = content.trim().slice(0, 8000);
+    return NextResponse.json({ success: true, source: "openrouter", model: usedModel, answer });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Something went wrong.";
     console.error("[ask] Failed:", message);

@@ -220,11 +220,15 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
     setGmailStatus("idle");
     setGmailError(null);
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45_000);
+
     try {
       const response = await fetch("/api/outreach/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ member_pco_id: row.member.pco_id, type }),
+        body: JSON.stringify({ member_pco_id: row.member.pco_id, church_id: churchId, type }),
+        signal: controller.signal,
       });
 
       const result = (await response.json()) as {
@@ -246,9 +250,14 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
       } else {
         setDraftError("Unexpected response type from server.");
       }
-    } catch {
-      setDraftError("Could not reach the generate service. Please try again.");
+    } catch (err) {
+      setDraftError(
+        err instanceof Error && err.name === "AbortError"
+          ? "Generation timed out. Please try again."
+          : "Could not reach the generate service. Please try again.",
+      );
     } finally {
+      clearTimeout(timeout);
       setGenerating(null);
     }
   };
@@ -632,7 +641,7 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
                 {draft.type === "email" && draft.subject ? (
                   <p className="text-sm font-semibold text-foreground">Subject: {draft.subject}</p>
                 ) : null}
-                <pre className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+                <pre className="shepherd-scrollbar max-h-64 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 text-muted-foreground">
                   {draft.body}
                 </pre>
                 <p className="text-xs text-muted-foreground/70">

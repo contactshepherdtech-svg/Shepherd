@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { Send, Sparkles } from "lucide-react";
 
 import { PageShell } from "@/components/page-shell";
@@ -12,7 +12,12 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 
-type ChatMessage = { role: "user" | "assistant"; content: string };
+type ChatMessage = { id: string; role: "user" | "assistant"; content: string };
+
+const BUBBLE_CLASS =
+  "max-w-[min(100%,42rem)] break-words [overflow-wrap:anywhere] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-6 shadow-sm";
+
+const ASK_TIMEOUT_MS = 45_000;
 
 const SUGGESTIONS = [
   "Who hasn't attended in a month?",
@@ -28,28 +33,41 @@ export default function AskPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const messageIdRef = useRef(0);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({ behavior: sending ? "auto" : "smooth" });
   }, [messages.length, sending]);
 
   const send = async (question: string) => {
     const trimmed = question.trim();
     if (!trimmed || sending || !churchId) return;
+    if (!supabase) {
+      setError("Shepherd is not connected. Check your configuration.");
+      return;
+    }
 
     setError(null);
     setInput("");
 
-    const history = messages.slice(-6);
-    const nextMessages = [...messages, { role: "user" as const, content: trimmed }];
-    setMessages(nextMessages);
+    const history = messages.slice(-6).map(({ role, content }) => ({ role, content }));
+    const userMessage: ChatMessage = {
+      id: `msg-${++messageIdRef.current}`,
+      role: "user",
+      content: trimmed,
+    };
+    setMessages((current) => [...current, userMessage]);
     setSending(true);
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), ASK_TIMEOUT_MS);
+
     try {
-      const { data: sessionData, error: sessionError } = await supabase!.auth.getSession();
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
       if (sessionError || !accessToken) {
         setError("Your session expired. Please sign in again.");
+        setMessages((current) => current.filter((message) => message.id !== userMessage.id));
         return;
       }
 
@@ -57,6 +75,7 @@ export default function AskPage() {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({ church_id: churchId, question: trimmed, history }),
+        signal: controller.signal,
       });
 
       const data = (await response.json()) as { success: boolean; answer?: string; error?: string };
@@ -66,10 +85,18 @@ export default function AskPage() {
         return;
       }
 
-      setMessages((current) => [...current, { role: "assistant", content: data.answer! }]);
-    } catch {
-      setError("Something went wrong reaching the assistant. Please try again.");
+      setMessages((current) => [
+        ...current,
+        { id: `msg-${++messageIdRef.current}`, role: "assistant", content: data.answer! },
+      ]);
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        setError("That took too long. Please try again.");
+      } else {
+        setError("Something went wrong reaching the assistant. Please try again.");
+      }
     } finally {
+      clearTimeout(timeout);
       setSending(false);
     }
   };
@@ -118,9 +145,9 @@ export default function AskPage() {
         </p>
       </section>
 
-      <Card className="shepherd-elevate flex min-h-[560px] flex-col">
-        <CardContent className="flex flex-1 flex-col gap-4 p-5">
-          <div className="shepherd-scrollbar flex-1 space-y-4 overflow-y-auto pr-1">
+      <Card className="shepherd-elevate flex h-[min(720px,calc(100vh-11rem))] min-h-[420px] flex-col">
+        <CardContent className="flex min-h-0 flex-1 flex-col gap-4 p-5">
+          <div className="shepherd-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden pr-1">
             {!hasConversation ? (
               <div className="flex h-full flex-col items-start justify-center gap-5 py-8">
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -143,27 +170,22 @@ export default function AskPage() {
                 </div>
               </div>
             ) : (
-              <AnimatePresence initial={false}>
-                {messages.map((message, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.22 }}
-                    className={message.role === "user" ? "flex justify-end" : "flex justify-start"}
+              messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={message.role === "user" ? "flex justify-end" : "flex justify-start"}
+                >
+                  <div
+                    className={
+                      message.role === "user"
+                        ? `${BUBBLE_CLASS} bg-primary text-primary-foreground`
+                        : `${BUBBLE_CLASS} border border-border bg-[#FAFBFA] text-foreground`
+                    }
                   >
-                    <div
-                      className={
-                        message.role === "user"
-                          ? "max-w-[80%] whitespace-pre-wrap rounded-2xl bg-primary px-4 py-2.5 text-sm text-primary-foreground shadow-sm"
-                          : "max-w-[85%] whitespace-pre-wrap rounded-2xl border border-border bg-[#FAFBFA] px-4 py-2.5 text-sm leading-6 text-foreground"
-                      }
-                    >
-                      {message.content}
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+                    {message.content}
+                  </div>
+                </div>
+              ))
             )}
 
             {sending ? (

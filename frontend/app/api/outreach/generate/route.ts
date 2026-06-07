@@ -129,37 +129,43 @@ async function callOpenRouter(
   systemPrompt: string,
   userMessage: string,
 ): Promise<string | null> {
-  console.log("Calling OpenRouter");
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "http://localhost:3000",
-      "X-Title": "Shepherd",
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25_000);
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "Shepherd",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+      }),
+      signal: controller.signal,
+    });
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    const error = `HTTP ${response.status}: ${text.slice(0, 200)}`;
-    console.error("OpenRouter failed", error);
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      console.error("[outreach] OpenRouter failed", `HTTP ${response.status}: ${text.slice(0, 200)}`);
+      return null;
+    }
+
+    const data = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    return data.choices?.[0]?.message?.content ?? null;
+  } catch (err) {
+    console.error("[outreach] OpenRouter request error", err);
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const content = data.choices?.[0]?.message?.content ?? null;
-  if (content) console.log("OpenRouter success");
-  return content;
 }
 
 // Rule-based fallbacks — always produce something sensible
@@ -293,9 +299,6 @@ export async function POST(request: Request): Promise<NextResponse> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   const primaryModel = process.env.OPENROUTER_MODEL ?? "openai/gpt-oss-120b:free";
   const fallbackModel = "z-ai/glm-4.5-air:free";
-
-  console.log("OPENROUTER_API_KEY loaded:", !!apiKey);
-  console.log("Model:", process.env.OPENROUTER_MODEL);
 
   if (apiKey && apiKey !== "your_openrouter_key") {
     const systemPrompt = buildSystemPrompt(outreachType);
