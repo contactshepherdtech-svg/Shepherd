@@ -100,18 +100,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Get the existing session on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const currentUser = session?.user ?? null;
+    let resolved = false;
+    const apply = (currentUser: User | null) => {
       setUser(currentUser);
       void loadWorkspace(currentUser).finally(() => setLoading(false));
+    };
+
+    // onAuthStateChange fires INITIAL_SESSION immediately and is reliable even
+    // when getSession() stalls, so it drives the initial load.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      resolved = true;
+      apply(session?.user ?? null);
     });
 
-    // Subscribe to subsequent auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      void loadWorkspace(currentUser);
+    // Fallback in case the initial event is missed.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!resolved) apply(session?.user ?? null);
+    }).catch((error) => {
+      console.error("Failed to load session", error);
+      if (!resolved) setLoading(false);
     });
 
     return () => subscription.unsubscribe();
