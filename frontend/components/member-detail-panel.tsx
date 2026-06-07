@@ -19,9 +19,13 @@ import { RiskBadge } from "@/components/risk-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  getVisitorLifecycleLabel,
   getGmailConnection,
   getOutreachStatuses,
+  isVisitorFollowUpDue,
+  isVisitorFollowUpLifecycle,
   isGmailConnected,
+  markVisitorFollowedUp,
   upsertOutreachStatus,
   type MemberDirectoryRow,
   type OutreachStatusRecord,
@@ -60,6 +64,7 @@ type MemberDetailPanelProps = {
   churchId: number | null;
   autoGenerateEmail?: boolean;
   onAutoEmailTriggered?: () => void;
+  onVisitorFollowedUp?: (memberPcoId: string, followedUpAt: string) => void;
 };
 
 function buildAttendanceBuckets(attendanceHistory: Date[]) {
@@ -106,7 +111,13 @@ function getAttendanceTrend(attendanceHistory: Date[]) {
 type GmailDraftStatus = "idle" | "creating" | "success" | "error";
 type OutreachActionState = "idle" | "loading" | "success" | "error";
 
-export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmailTriggered }: MemberDetailPanelProps) {
+export function MemberDetailPanel({
+  row,
+  churchId,
+  autoGenerateEmail,
+  onAutoEmailTriggered,
+  onVisitorFollowedUp,
+}: MemberDetailPanelProps) {
   const [generating, setGenerating] = useState<OutreachType | null>(null);
   const [draft, setDraft] = useState<DraftResult | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
@@ -118,6 +129,10 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
   const [outreachActionState, setOutreachActionState] = useState<OutreachActionState>("idle");
   const [outreachMessage, setOutreachMessage] = useState<string | null>(null);
   const [outreachError, setOutreachError] = useState<string | null>(null);
+  const [visitorFollowUpAt, setVisitorFollowUpAt] = useState<Date | null>(row.member.last_followup_at);
+  const [visitorFollowUpState, setVisitorFollowUpState] = useState<OutreachActionState>("idle");
+  const [visitorFollowUpMessage, setVisitorFollowUpMessage] = useState<string | null>(null);
+  const [visitorFollowUpError, setVisitorFollowUpError] = useState<string | null>(null);
 
   // Load outreach status and Gmail connection whenever churchId changes
   useEffect(() => {
@@ -154,6 +169,13 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
     void onGenerate("email");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoGenerateEmail]);
+
+  useEffect(() => {
+    setVisitorFollowUpAt(row.member.last_followup_at);
+    setVisitorFollowUpState("idle");
+    setVisitorFollowUpMessage(null);
+    setVisitorFollowUpError(null);
+  }, [row.member.id, row.member.last_followup_at]);
 
   const handleOutreachAction = async (
     action: () => Promise<void>,
@@ -211,6 +233,30 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
 
   const recentAttendance = row.attendance_history.slice(0, 6);
   const recommendedAction = row.risk.tier ? tierActionMap[row.risk.tier] : "No action available until scoring runs";
+  const isVisitor = isVisitorFollowUpLifecycle(row.member.member_lifecycle);
+  const visitorFollowUpDue = isVisitorFollowUpDue(row.member.member_lifecycle, visitorFollowUpAt);
+  const lastFollowUpLabel = visitorFollowUpAt ? formatDate(visitorFollowUpAt) : "Not followed up";
+
+  const onMarkVisitorFollowedUp = async () => {
+    if (!row.member.pco_id) return;
+
+    setVisitorFollowUpState("loading");
+    setVisitorFollowUpMessage(null);
+    setVisitorFollowUpError(null);
+
+    try {
+      const result = await markVisitorFollowedUp(row.member.pco_id);
+      const followedUpDate = new Date(result.last_followup_at);
+      setVisitorFollowUpAt(Number.isNaN(followedUpDate.getTime()) ? new Date() : followedUpDate);
+      setVisitorFollowUpMessage("Last follow-up saved.");
+      setVisitorFollowUpState("success");
+      onVisitorFollowedUp?.(result.member_pco_id, result.last_followup_at);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not mark visitor followed up.";
+      setVisitorFollowUpError(msg);
+      setVisitorFollowUpState("idle");
+    }
+  };
 
   const onGenerate = async (type: OutreachType) => {
     setGenerating(type);
@@ -337,6 +383,16 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
               <span className="rounded-full border border-border/80 bg-[#F3F5F4] px-2.5 py-1 text-xs font-medium text-muted-foreground">
                 Last attended {formatDate(row.last_attended)}
               </span>
+              {isVisitor ? (
+                <>
+                  <span className="rounded-full border border-border/80 bg-[#F3F5F4] px-2.5 py-1 text-xs font-medium text-foreground">
+                    {getVisitorLifecycleLabel(row.member.member_lifecycle)}
+                  </span>
+                  <span className="rounded-full border border-border/80 bg-[#F3F5F4] px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                    Last follow-up {lastFollowUpLabel}
+                  </span>
+                </>
+              ) : null}
             </div>
           </div>
         </CardHeader>
@@ -474,6 +530,12 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
               <span className="text-muted-foreground">Attendance trend</span>
               <span className="font-semibold">{attendanceTrend}</span>
             </div>
+            {isVisitor ? (
+              <div className="flex items-center justify-between rounded-lg border border-border/80 bg-[#FAFBFA] px-3 py-2">
+                <span className="text-muted-foreground">Last Follow-Up</span>
+                <span className="font-semibold">{lastFollowUpLabel}</span>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -506,6 +568,44 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
           <CardTitle>Generate communication drafts</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {isVisitor && churchId && row.member.pco_id ? (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    Visitor Follow-Up
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-foreground">
+                    {getVisitorLifecycleLabel(row.member.member_lifecycle)} - Last Follow-Up {lastFollowUpLabel}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => void onMarkVisitorFollowedUp()}
+                  disabled={
+                    visitorFollowUpState === "loading" ||
+                    visitorFollowUpState === "success" ||
+                    !visitorFollowUpDue
+                  }
+                  className="justify-start gap-1.5"
+                >
+                  <CheckCircle2 className="size-3.5" />
+                  {visitorFollowUpState === "loading"
+                    ? "Saving..."
+                    : visitorFollowUpState === "success" || !visitorFollowUpDue
+                      ? "Followed Up"
+                      : "Mark Visitor Followed Up"}
+                </Button>
+              </div>
+              {visitorFollowUpMessage ? (
+                <p className="mt-2 text-xs font-medium text-primary">{visitorFollowUpMessage}</p>
+              ) : null}
+              {visitorFollowUpError ? (
+                <p className="mt-2 text-xs text-red-600">{visitorFollowUpError}</p>
+              ) : null}
+            </div>
+          ) : null}
+
           {/* Current outreach status badge */}
           {outreachStatus && outreachStatus.status !== "active" ? (
             <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3 text-sm">

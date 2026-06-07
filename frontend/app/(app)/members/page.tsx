@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Filter, Search } from "lucide-react";
 
@@ -83,6 +83,24 @@ function MembersContent() {
 
     setSelectedId((matchingMember ?? memberRows[0]).member.id);
   }, [memberParam, memberRows, selectedId]);
+
+  const onVisitorFollowedUp = useCallback((memberPcoId: string, followedUpAt: string) => {
+    const followedUpDate = new Date(followedUpAt);
+
+    setMemberRows((current) =>
+      current.map((row) =>
+        row.member.pco_id === memberPcoId
+          ? {
+              ...row,
+              member: {
+                ...row.member,
+                last_followup_at: Number.isNaN(followedUpDate.getTime()) ? new Date() : followedUpDate,
+              },
+            }
+          : row,
+      ),
+    );
+  }, []);
 
   const filteredRows = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -193,6 +211,7 @@ function MembersContent() {
               churchId={churchId}
               autoGenerateEmail={pendingAction === "email"}
               onAutoEmailTriggered={() => setPendingAction(null)}
+              onVisitorFollowedUp={onVisitorFollowedUp}
             />
           ) : null}
           {!selectedMember ? (

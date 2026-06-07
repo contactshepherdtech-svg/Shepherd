@@ -30,6 +30,18 @@ export type EditableChurchSettings = Pick<
 export type IntegrationTokenRecord = IntegrationTokenRow;
 
 export type RiskTier = "Healthy" | "Watch" | "At Risk" | "Critical";
+export type VisitorFollowUpLifecycle =
+  | "first_time_visitor"
+  | "returned_visitor"
+  | "needs_first_followup";
+
+const visitorFollowUpLifecycles = new Set<string>([
+  "first_time_visitor",
+  "returned_visitor",
+  "needs_first_followup",
+]);
+
+const followUpStaleAfterMs = 5 * 24 * 60 * 60 * 1000;
 
 export type MemberDirectoryRow = {
   member: {
@@ -40,6 +52,8 @@ export type MemberDirectoryRow = {
     status: string;
     household: string;
     ministry: string;
+    member_lifecycle: string | null;
+    last_followup_at: Date | null;
   };
   risk: {
     member_id: string;
@@ -134,6 +148,34 @@ function getDaysSince(date: Date | null): number | null {
   if (!date) return null;
 
   return Math.max(Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24)), 0);
+}
+
+export function isVisitorFollowUpLifecycle(
+  lifecycle: string | null | undefined,
+): lifecycle is VisitorFollowUpLifecycle {
+  return Boolean(lifecycle && visitorFollowUpLifecycles.has(lifecycle));
+}
+
+export function isVisitorFollowUpDue(
+  lifecycle: string | null | undefined,
+  lastFollowUpAt: Date | string | null | undefined,
+): boolean {
+  if (!isVisitorFollowUpLifecycle(lifecycle)) return false;
+  if (!lastFollowUpAt) return true;
+
+  const parsed = lastFollowUpAt instanceof Date ? lastFollowUpAt : getSafeDate(lastFollowUpAt);
+  if (!parsed) return true;
+
+  return parsed.getTime() < Date.now() - followUpStaleAfterMs;
+}
+
+export function getVisitorLifecycleLabel(lifecycle: string | null | undefined): string {
+  if (lifecycle === "first_time_visitor") return "First-time visitor";
+  if (lifecycle === "returned_visitor") return "Returned visitor";
+  if (lifecycle === "needs_first_followup") return "Needs first follow-up";
+  if (lifecycle === "new_no_attendance") return "New, no attendance";
+  if (lifecycle === "established_member") return "Established member";
+  return "Lifecycle unknown";
 }
 
 export async function getChurch(churchId: number): Promise<ChurchRow | null> {
@@ -380,6 +422,8 @@ export function buildMemberDirectoryRows(
         status: member.status?.trim() || "Active",
         household: "Congregation",
         ministry: "General Ministry",
+        member_lifecycle: member.member_lifecycle ?? null,
+        last_followup_at: getSafeDate(member.last_followup_at),
       },
       risk: {
         member_id: memberRisk?.member_pco_id || memberId,
@@ -481,7 +525,13 @@ export function getEngagementOverview(memberRows: MemberDirectoryRow[]): Engagem
 
 export function getPriorityOutreachRows(memberRows: MemberDirectoryRow[]): MemberDirectoryRow[] {
   return memberRows
-    .filter((row) => row.risk.tier === "Watch" || row.risk.tier === "At Risk" || row.risk.tier === "Critical")
+    .filter((row) => {
+      if (isVisitorFollowUpLifecycle(row.member.member_lifecycle)) {
+        return isVisitorFollowUpDue(row.member.member_lifecycle, row.member.last_followup_at);
+      }
+
+      return row.risk.tier === "Watch" || row.risk.tier === "At Risk" || row.risk.tier === "Critical";
+    })
     .sort((left, right) => (right.risk.score ?? -1) - (left.risk.score ?? -1));
 }
 
@@ -543,6 +593,38 @@ export async function upsertOutreachStatus(
       .insert({ ...payload, created_at: now } as never);
     if (error) throw error;
   }
+}
+
+export async function markVisitorFollowedUp(
+  memberPcoId: string,
+): Promise<{ member_pco_id: string; last_followup_at: string }> {
+  const client = requireSupabaseClient();
+  const accessToken = (await client.auth.getSession()).data.session?.access_token;
+
+  const response = await fetch("/api/visitors/mark-followed-up", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify({ member_pco_id: memberPcoId }),
+  });
+
+  const result = (await response.json().catch(() => ({}))) as {
+    success?: boolean;
+    member_pco_id?: string;
+    last_followup_at?: string;
+    error?: string;
+  };
+
+  if (!response.ok || !result.success || !result.member_pco_id || !result.last_followup_at) {
+    throw new Error(result.error ?? "Could not mark this visitor followed up.");
+  }
+
+  return {
+    member_pco_id: result.member_pco_id,
+    last_followup_at: result.last_followup_at,
+  };
 }
 
 export function isVisibleInQueue(memberPcoId: string | null, statuses: OutreachStatusRecord[]): boolean {

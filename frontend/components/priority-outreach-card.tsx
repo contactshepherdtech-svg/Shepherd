@@ -8,13 +8,21 @@ import { ArrowRight, BellOff, CheckCircle2, Mail } from "lucide-react";
 import { RiskBadge } from "@/components/risk-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { upsertOutreachStatus, type MemberDirectoryRow } from "@/lib/data";
+import {
+  getVisitorLifecycleLabel,
+  isVisitorFollowUpDue,
+  isVisitorFollowUpLifecycle,
+  markVisitorFollowedUp,
+  upsertOutreachStatus,
+  type MemberDirectoryRow,
+} from "@/lib/data";
 import { formatDate } from "@/lib/format";
 
 type PriorityOutreachCardProps = {
   row: MemberDirectoryRow;
   churchId: number;
   onStatusChange: () => void;
+  onVisitorFollowedUp?: (memberPcoId: string, followedUpAt: string) => void;
 };
 
 const recommendedActionByTier = {
@@ -26,17 +34,32 @@ const recommendedActionByTier = {
 
 type ActionState = "idle" | "loading" | "success";
 
-export function PriorityOutreachCard({ row, churchId, onStatusChange }: PriorityOutreachCardProps) {
+export function PriorityOutreachCard({
+  row,
+  churchId,
+  onStatusChange,
+  onVisitorFollowedUp,
+}: PriorityOutreachCardProps) {
   const [actionState, setActionState] = useState<ActionState>("idle");
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [visitorFollowUpState, setVisitorFollowUpState] = useState<ActionState>("idle");
+  const [visitorFollowUpMessage, setVisitorFollowUpMessage] = useState<string | null>(null);
+  const [visitorFollowUpError, setVisitorFollowUpError] = useState<string | null>(null);
 
-  const recommendedAction = row.risk.tier ? recommendedActionByTier[row.risk.tier] : "No action available";
+  const isVisitor = isVisitorFollowUpLifecycle(row.member.member_lifecycle);
+  const visitorFollowUpDue = isVisitorFollowUpDue(row.member.member_lifecycle, row.member.last_followup_at);
+  const recommendedAction = isVisitor
+    ? "Personal visitor follow-up"
+    : row.risk.tier
+      ? recommendedActionByTier[row.risk.tier]
+      : "No action available";
   const memberId = encodeURIComponent(row.member.pco_id || row.member.id);
   const memberProfileHref = `/members?member=${memberId}`;
   const draftEmailHref = `/members?member=${memberId}&action=email`;
   const memberPcoId = row.member.pco_id;
   const isLoading = actionState === "loading";
+  const isVisitorFollowUpLoading = visitorFollowUpState === "loading";
 
   const handleAction = async (
     action: () => Promise<void>,
@@ -84,6 +107,25 @@ export function PriorityOutreachCard({ row, churchId, onStatusChange }: Priority
       `Snoozed for ${days} days.`,
     );
 
+  const onMarkVisitorFollowedUp = async () => {
+    if (!memberPcoId) return;
+
+    setVisitorFollowUpState("loading");
+    setVisitorFollowUpMessage(null);
+    setVisitorFollowUpError(null);
+
+    try {
+      const result = await markVisitorFollowedUp(memberPcoId);
+      setVisitorFollowUpMessage("Visitor follow-up saved.");
+      setVisitorFollowUpState("success");
+      onVisitorFollowedUp?.(result.member_pco_id, result.last_followup_at);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not mark visitor followed up.";
+      setVisitorFollowUpError(msg);
+      setVisitorFollowUpState("idle");
+    }
+  };
+
   return (
     <motion.div
       layout
@@ -113,6 +155,10 @@ export function PriorityOutreachCard({ row, churchId, onStatusChange }: Priority
                   <li key={reason}>{reason}</li>
                 ))}
               </ul>
+            ) : isVisitor ? (
+              <p className="mt-1 text-sm text-foreground">
+                {getVisitorLifecycleLabel(row.member.member_lifecycle)} awaiting personal follow-up.
+              </p>
             ) : (
               <p className="mt-1 text-sm text-foreground">No risk context available yet.</p>
             )}
@@ -128,6 +174,18 @@ export function PriorityOutreachCard({ row, churchId, onStatusChange }: Priority
             <p>
               <span className="font-medium text-foreground">Recommended:</span> {recommendedAction}
             </p>
+            {isVisitor ? (
+              <>
+                <p>
+                  <span className="font-medium text-foreground">Visitor Status:</span>{" "}
+                  {getVisitorLifecycleLabel(row.member.member_lifecycle)}
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">Last Follow-Up:</span>{" "}
+                  {row.member.last_followup_at ? formatDate(row.member.last_followup_at) : "Not followed up"}
+                </p>
+              </>
+            ) : null}
           </div>
 
           <div>
@@ -144,6 +202,34 @@ export function PriorityOutreachCard({ row, churchId, onStatusChange }: Priority
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Outreach Actions
             </p>
+            {isVisitor ? (
+              <div className="space-y-2">
+                <Button
+                  size="sm"
+                  onClick={() => void onMarkVisitorFollowedUp()}
+                  disabled={
+                    isVisitorFollowUpLoading ||
+                    visitorFollowUpState === "success" ||
+                    !visitorFollowUpDue ||
+                    !memberPcoId
+                  }
+                  className="w-full justify-start gap-1.5"
+                >
+                  <CheckCircle2 className="size-3.5" />
+                  {isVisitorFollowUpLoading
+                    ? "Saving..."
+                    : visitorFollowUpState === "success" || !visitorFollowUpDue
+                      ? "Followed Up"
+                      : "Mark Visitor Followed Up"}
+                </Button>
+                {visitorFollowUpMessage ? (
+                  <p className="text-xs font-medium text-primary">{visitorFollowUpMessage}</p>
+                ) : null}
+                {visitorFollowUpError ? (
+                  <p className="text-xs text-red-600">{visitorFollowUpError}</p>
+                ) : null}
+              </div>
+            ) : null}
             <div className="grid gap-2 sm:grid-cols-3">
               <Button
                 size="sm"

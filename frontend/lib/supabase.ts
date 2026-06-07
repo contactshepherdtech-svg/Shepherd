@@ -36,6 +36,11 @@ export type Database = {
           email: string | null;
           status: string | null;
           source: string | null;
+          pco_created_at: string | null;
+          first_visit_date: string | null;
+          visitor_status: string | null;
+          member_lifecycle: string | null;
+          last_followup_at: string | null;
           created_at: string | null;
         };
       };
