@@ -197,18 +197,6 @@ export async function GET(request: Request): Promise<NextResponse> {
       : null;
     const now = new Date().toISOString();
 
-    const payload = {
-      church_id: churchId,
-      provider: "gmail",
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token ?? null,
-      expires_at: expiresAt,
-      scope: tokenData.scope ?? null,
-      connection_status: "connected",
-      connected_email: connectedEmail,
-      updated_at: now,
-    };
-
     const { data: existing } = await db
       .from("integration_tokens")
       .select("*")
@@ -216,11 +204,27 @@ export async function GET(request: Request): Promise<NextResponse> {
       .eq("provider", "gmail")
       .limit(1);
 
-    if (existing && existing.length > 0) {
+    const existingRow = existing?.[0] as { id: number; refresh_token: string | null } | undefined;
+
+    const payload = {
+      church_id: churchId,
+      provider: "gmail",
+      access_token: tokenData.access_token,
+      // Google only returns a refresh_token on the first grant; on reconnects it
+      // is often omitted. Never clobber a previously stored one with null.
+      refresh_token: tokenData.refresh_token ?? existingRow?.refresh_token ?? null,
+      expires_at: expiresAt,
+      scope: tokenData.scope ?? null,
+      connection_status: "connected",
+      connected_email: connectedEmail,
+      updated_at: now,
+    };
+
+    if (existingRow) {
       const { error: updateError } = await db
         .from("integration_tokens")
         .update(payload as never)
-        .eq("id", (existing[0] as { id: number }).id);
+        .eq("id", existingRow.id);
 
       if (updateError) {
         console.error("[gmail/callback] Supabase update failed:", updateError);

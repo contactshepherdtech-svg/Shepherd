@@ -74,6 +74,15 @@ async function getValidAccessToken(token: GmailTokenRow): Promise<string> {
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
+    // A revoked/expired refresh token won't recover on retry — flag the row as
+    // disconnected so the UI prompts the user to reconnect Gmail.
+    const db = getServiceRoleClient();
+    if (db) {
+      await db
+        .from("integration_tokens")
+        .update({ connection_status: "disconnected", updated_at: new Date().toISOString() } as never)
+        .eq("id", token.id);
+    }
     throw new Error(`Token refresh failed: ${response.status} ${text.slice(0, 200)}`);
   }
 

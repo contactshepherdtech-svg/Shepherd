@@ -9,8 +9,6 @@ import {
   motion,
   useMotionValue,
   useMotionValueEvent,
-  useScroll,
-  useSpring,
   useTransform,
 } from "framer-motion";
 import {
@@ -45,12 +43,10 @@ export function Sidebar() {
   const { churchName, user, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
-  const { scrollY } = useScroll();
-  const compactness = useSpring(useTransform(scrollY, [0, 240], [0, 1], { clamp: true }), {
-    stiffness: 180,
-    damping: 30,
-    mass: 0.32,
-  });
+  // Sidebar compactness is driven solely by the manual collapse toggle. It used
+  // to be coupled to window scrollY, which made the sidebar shrink/"close" as the
+  // user scrolled the page content — confusing and unwanted.
+  const compactness = useMotionValue(0);
   const sidebarWidth = useMotionValue(EXPANDED_WIDTH);
   const sidePadding = useTransform(compactness, [0, 1], [12, 10]);
   const brandHeight = useTransform(compactness, (value) =>
