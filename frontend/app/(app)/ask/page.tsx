@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Send, Sparkles } from "lucide-react";
 
+import { FormattedMessage } from "@/components/formatted-message";
 import { PageShell } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,8 +15,11 @@ import { supabase } from "@/lib/supabase";
 
 type ChatMessage = { id: string; role: "user" | "assistant"; content: string };
 
-const BUBBLE_CLASS =
-  "max-w-[min(100%,42rem)] break-words [overflow-wrap:anywhere] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-6 shadow-sm";
+const USER_BUBBLE_CLASS =
+  "max-w-[min(100%,36rem)] break-words [overflow-wrap:anywhere] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-6 text-primary-foreground shadow-sm";
+
+const ASSISTANT_BUBBLE_CLASS =
+  "max-w-[min(100%,46rem)] break-words [overflow-wrap:anywhere] rounded-2xl rounded-bl-md border border-border bg-[#FAFBFA] px-4 py-3.5 text-sm leading-6 text-foreground shadow-sm";
 
 const ASK_TIMEOUT_MS = 45_000;
 
@@ -171,20 +175,21 @@ export default function AskPage() {
               </div>
             ) : (
               messages.map((message) => (
-                <div
+                <motion.div
                   key={message.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
                   className={message.role === "user" ? "flex justify-end" : "flex justify-start"}
                 >
-                  <div
-                    className={
-                      message.role === "user"
-                        ? `${BUBBLE_CLASS} bg-primary text-primary-foreground`
-                        : `${BUBBLE_CLASS} border border-border bg-[#FAFBFA] text-foreground`
-                    }
-                  >
-                    {message.content}
-                  </div>
-                </div>
+                  {message.role === "user" ? (
+                    <div className={USER_BUBBLE_CLASS}>{message.content}</div>
+                  ) : (
+                    <div className={ASSISTANT_BUBBLE_CLASS}>
+                      <FormattedMessage content={message.content} />
+                    </div>
+                  )}
+                </motion.div>
               ))
             )}
 
