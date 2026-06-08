@@ -1,15 +1,38 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 import type { Database } from "@/lib/supabase";
 
 type OutreachType = "email" | "sms" | "call_script";
 
-function getSupabase() {
+// Build an authed Supabase client from the request's Authorization header so RLS
+// scopes every query to the caller's church (mirrors app/api/ask/route.ts).
+function getAuthedClient(authorization: string): SupabaseClient<Database> | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
-  return createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  return createClient<Database>(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: authorization } },
+  });
+}
+
+async function resolveChurchId(authedDb: SupabaseClient<Database>, userId: string): Promise<number> {
+  const { data, error } = await authedDb
+    .from("church_users")
+    .select("church_id")
+    .eq("user_id", userId)
+    .limit(1);
+  if (error) {
+    console.error("[outreach] Church membership lookup failed:", error);
+    throw new Error("Could not verify active church.");
+  }
+  const rows = data as Array<{ church_id: number }> | null;
+  const churchId = rows?.[0]?.church_id;
+  if (!Number.isInteger(churchId) || churchId == null || churchId <= 0) {
+    throw new Error("No active church found for this user.");
+  }
+  return churchId;
 }
 
 // Extract the first balanced JSON object from arbitrary model output
@@ -223,6 +246,33 @@ function fallbackCallScript(firstName: string) {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  // Require an authenticated caller and resolve their church server-side so a
+  // client can never request outreach context for another church's member.
+  const authorization = request.headers.get("authorization") ?? request.headers.get("Authorization");
+  if (!authorization) {
+    return NextResponse.json({ success: false, error: "Not authenticated." }, { status: 401 });
+  }
+
+  const authedDb = getAuthedClient(authorization);
+  if (!authedDb) {
+    return NextResponse.json({ success: false, error: "Server is not configured." }, { status: 500 });
+  }
+
+  const { data: userData, error: userError } = await authedDb.auth.getUser();
+  if (userError || !userData?.user) {
+    return NextResponse.json({ success: false, error: "Not authenticated." }, { status: 401 });
+  }
+
+  let churchId: number;
+  try {
+    churchId = await resolveChurchId(authedDb, userData.user.id);
+  } catch (err) {
+    return NextResponse.json(
+      { success: false, error: err instanceof Error ? err.message : "Could not verify active church." },
+      { status: 403 },
+    );
+  }
+
   let member_pco_id: string | null | undefined;
   let type: string | undefined;
 
@@ -251,13 +301,18 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   if (member_pco_id) {
     try {
-      const db = getSupabase();
-      if (db) {
+      {
         const [memberRes, attendanceRes] = await Promise.all([
-          db.from("members").select("*").eq("pco_id", member_pco_id).limit(1),
-          db
+          authedDb
+            .from("members")
+            .select("*")
+            .eq("church_id", churchId)
+            .eq("pco_id", member_pco_id)
+            .limit(1),
+          authedDb
             .from("attendance")
             .select("*")
+            .eq("church_id", churchId)
             .eq("member_pco_id", member_pco_id)
             .order("attended_at", { ascending: false })
             .limit(20),

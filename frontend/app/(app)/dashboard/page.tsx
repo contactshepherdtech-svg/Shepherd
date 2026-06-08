@@ -51,18 +51,29 @@ export default function DashboardPage() {
         return;
       }
 
-      const [members, attendance, riskScores] = await Promise.all([
-        getMembers(churchId),
-        getAttendance(churchId),
-        getRiskScores(churchId),
-      ]);
+      try {
+        const [members, attendance, riskScores] = await Promise.all([
+          getMembers(churchId),
+          getAttendance(churchId),
+          getRiskScores(churchId),
+        ]);
 
-      if (active) {
-        setTotalMembers(members.length);
-        setMemberRows(buildMemberDirectoryRows(members, riskScores, attendance));
-        setAttendanceRows(attendance);
-        setRiskRows(riskScores);
-        setLoading(false);
+        if (active) {
+          setTotalMembers(members.length);
+          setMemberRows(buildMemberDirectoryRows(members, riskScores, attendance));
+          setAttendanceRows(attendance);
+          setRiskRows(riskScores);
+        }
+      } catch (error) {
+        console.error("Failed to load dashboard data", error);
+        if (active) {
+          setTotalMembers(0);
+          setMemberRows([]);
+          setAttendanceRows([]);
+          setRiskRows([]);
+        }
+      } finally {
+        if (active) setLoading(false);
       }
     };
 

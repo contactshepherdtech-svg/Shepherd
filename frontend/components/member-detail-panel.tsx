@@ -224,9 +224,17 @@ export function MemberDetailPanel({ row, churchId, autoGenerateEmail, onAutoEmai
     const timeout = setTimeout(() => controller.abort(), 45_000);
 
     try {
+      const accessToken = supabase
+        ? (await supabase.auth.getSession()).data.session?.access_token
+        : undefined;
+      if (!accessToken) {
+        setDraftError("Your session expired. Please sign in again.");
+        return;
+      }
+
       const response = await fetch("/api/outreach/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ member_pco_id: row.member.pco_id, church_id: churchId, type }),
         signal: controller.signal,
       });
