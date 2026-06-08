@@ -118,7 +118,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!resolved) apply(session?.user ?? null);
     }).catch((error) => {
       console.error("Failed to load session", error);
-      if (!resolved) setLoading(false);
+      // A stale/invalid refresh token in localStorage throws "Invalid Refresh
+      // Token: Refresh Token Not Found" and keeps erroring until cleared.
+      const message = String(error?.message ?? error);
+      if (/refresh token/i.test(message)) {
+        void supabase?.auth.signOut();
+      }
+      if (!resolved) apply(null);
     });
 
     return () => subscription.unsubscribe();
