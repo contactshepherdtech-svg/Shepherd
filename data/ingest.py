@@ -1,5 +1,7 @@
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import func
 
 from data.schema import (
     Attendance,
@@ -11,6 +13,18 @@ from data.schema import (
     init_db,
 )
 from utils.planning_center import get_people, get_checkins
+
+
+VISITOR_STATUS_FIRST_TIME = "first_time"
+VISITOR_STATUS_RETURNED = "returned"
+VISITOR_STATUS_CONVERTED = "converted"
+VISITOR_STATUS_NONE = "none"
+
+MEMBER_LIFECYCLE_NEW_NO_ATTENDANCE = "new_no_attendance"
+MEMBER_LIFECYCLE_FIRST_TIME_VISITOR = "first_time_visitor"
+MEMBER_LIFECYCLE_RETURNED_VISITOR = "returned_visitor"
+MEMBER_LIFECYCLE_ESTABLISHED_MEMBER = "established_member"
+MEMBER_LIFECYCLE_NEEDS_FIRST_FOLLOWUP = "needs_first_followup"
 
 
 def _active_church_id_from_env():
@@ -105,6 +119,84 @@ def _get_or_create_planning_center_token(db, church_id):
     return token
 
 
+def _attendance_summary(db, church_id, member_pco_id):
+    if not member_pco_id:
+        return 0, None
+
+    attendance_count, first_visit_date = (
+        db.query(func.count(Attendance.id), func.min(Attendance.attended_at))
+        .filter(
+            Attendance.church_id == church_id,
+            Attendance.member_pco_id == member_pco_id,
+            Attendance.attended_at.isnot(None),
+        )
+        .one()
+    )
+
+    return int(attendance_count or 0), first_visit_date
+
+
+def _is_recent_pco_person(pco_created_at, now):
+    if pco_created_at is None:
+        return False
+
+    if pco_created_at.tzinfo is not None:
+        pco_created_at = pco_created_at.astimezone(timezone.utc).replace(tzinfo=None)
+
+    return pco_created_at >= now - timedelta(days=14)
+
+
+def _apply_member_lifecycle(member, attendance_count, first_visit_date, now=None):
+    now = now or datetime.utcnow()
+
+    if attendance_count <= 0:
+        member.first_visit_date = None
+        member.visitor_status = VISITOR_STATUS_NONE
+        member.member_lifecycle = (
+            MEMBER_LIFECYCLE_NEW_NO_ATTENDANCE
+            if _is_recent_pco_person(member.pco_created_at, now)
+            else MEMBER_LIFECYCLE_NEEDS_FIRST_FOLLOWUP
+        )
+        return
+
+    member.first_visit_date = first_visit_date
+
+    if attendance_count == 1:
+        member.visitor_status = VISITOR_STATUS_FIRST_TIME
+        member.member_lifecycle = MEMBER_LIFECYCLE_FIRST_TIME_VISITOR
+        return
+
+    if attendance_count == 2:
+        member.visitor_status = VISITOR_STATUS_RETURNED
+        member.member_lifecycle = MEMBER_LIFECYCLE_RETURNED_VISITOR
+        return
+
+    member.visitor_status = VISITOR_STATUS_CONVERTED
+    member.member_lifecycle = MEMBER_LIFECYCLE_ESTABLISHED_MEMBER
+
+
+def _classify_member_lifecycles(db, church_id):
+    now = datetime.utcnow()
+    members = (
+        db.query(Member)
+        .filter(
+            Member.church_id == church_id,
+            Member.source == "planning_center",
+        )
+        .all()
+    )
+
+    for member in members:
+        attendance_count, first_visit_date = _attendance_summary(
+            db,
+            church_id,
+            member.pco_id,
+        )
+        _apply_member_lifecycle(member, attendance_count, first_visit_date, now=now)
+
+    return len(members)
+
+
 def save_people():
     init_db()
     db = SessionLocal()
@@ -133,6 +225,7 @@ def save_people():
         emails_found_count = 0
 
         for person in people_to_import:
+            parsed_pco_created_at = parse_pco_datetime(person.get("pco_created_at"))
             existing_member = (
                 db.query(Member)
                 .filter(
@@ -157,17 +250,19 @@ def save_people():
                 existing_member.email = person.get("email")
                 existing_member.status = person["status"]
                 existing_member.source = "planning_center"
+                if parsed_pco_created_at is not None:
+                    existing_member.pco_created_at = parsed_pco_created_at
             else:
-                db.add(
-                    Member(
-                        church_id=active_church_id,
-                        pco_id=person["pco_id"],
-                        name=person["name"],
-                        email=person.get("email"),
-                        status=person["status"],
-                        source="planning_center",
-                    )
+                existing_member = Member(
+                    church_id=active_church_id,
+                    pco_id=person["pco_id"],
+                    name=person["name"],
+                    email=person.get("email"),
+                    status=person["status"],
+                    source="planning_center",
+                    pco_created_at=parsed_pco_created_at,
                 )
+                db.add(existing_member)
 
             saved_members_count += 1
             if person.get("email"):
@@ -198,6 +293,10 @@ def save_people():
 
             if existing_checkin:
                 existing_checkin.church_id = active_church_id
+                if existing_checkin.attended_at is None:
+                    parsed_attended_at = parse_pco_datetime(checkin.get("attended_at"))
+                    if parsed_attended_at is not None:
+                        existing_checkin.attended_at = parsed_attended_at
                 continue
 
             db.add(
@@ -211,6 +310,9 @@ def save_people():
             )
             saved_attendance_count += 1
 
+        db.flush()
+        classified_members_count = _classify_member_lifecycles(db, active_church_id)
+
         token = _get_or_create_planning_center_token(db, active_church_id)
         token.connection_status = "connected"
         token.last_sync_at = datetime.utcnow()
@@ -220,9 +322,9 @@ def save_people():
 
         db.commit()
 
-        print(f"Saved {saved_members_count} members")
-        print(f"Saved {saved_attendance_count} attendance records")
-        print(f"Members imported: {saved_members_count}")
+        print(f"People imported: {saved_members_count}")
+        print(f"Attendance imported: {saved_attendance_count}")
+        print(f"Lifecycles updated: {classified_members_count}")
         print(f"Emails found: {emails_found_count}")
         print(f"Missing emails: {saved_members_count - emails_found_count}")
     except Exception:

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, TrendingUp, Users } from "lucide-react";
 
 import { ChurchHealthGauge } from "@/components/church-health-gauge";
@@ -83,6 +83,24 @@ export default function DashboardPage() {
       active = false;
     };
   }, [churchId]);
+
+  const onVisitorFollowedUp = useCallback((memberPcoId: string, followedUpAt: string) => {
+    const followedUpDate = new Date(followedUpAt);
+
+    setMemberRows((current) =>
+      current.map((row) =>
+        row.member.pco_id === memberPcoId
+          ? {
+              ...row,
+              member: {
+                ...row.member,
+                last_followup_at: Number.isNaN(followedUpDate.getTime()) ? new Date() : followedUpDate,
+              },
+            }
+          : row,
+      ),
+    );
+  }, []);
 
   const priorityRows = useMemo(() => getPriorityOutreachRows(memberRows).slice(0, 4), [memberRows]);
   const healthScore = useMemo(() => getChurchHealthScore(riskRows), [riskRows]);
@@ -229,9 +247,9 @@ export default function DashboardPage() {
               <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-6 text-center text-sm text-muted-foreground">
                 No members found.
               </div>
-            ) : !riskRows.length ? (
+            ) : !priorityRows.length ? (
               <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-6 text-center text-sm text-muted-foreground">
-                No risk scores found.
+                No active follow-up queue items.
               </div>
             ) : (
               <div className="grid gap-3 xl:grid-cols-2">
@@ -241,6 +259,7 @@ export default function DashboardPage() {
                     row={row}
                     churchId={churchId ?? 0}
                     onStatusChange={() => undefined}
+                    onVisitorFollowedUp={onVisitorFollowedUp}
                   />
                 ))}
               </div>

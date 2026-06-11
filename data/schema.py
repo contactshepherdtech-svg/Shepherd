@@ -58,6 +58,11 @@ class Member(Base):
     email = Column(String)
     status = Column(String)
     source = Column(String)
+    pco_created_at = Column(DateTime)
+    first_visit_date = Column(DateTime)
+    visitor_status = Column(String, default="none")
+    member_lifecycle = Column(String)
+    last_followup_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -159,6 +164,22 @@ def init_db():
             logger.info("Added missing members.email column.")
         if "church_id" not in member_columns:
             connection.exec_driver_sql("ALTER TABLE members ADD COLUMN church_id INTEGER")
+        if "pco_created_at" not in member_columns:
+            connection.exec_driver_sql("ALTER TABLE members ADD COLUMN pco_created_at TIMESTAMPTZ")
+            logger.info("Added missing members.pco_created_at column.")
+        if "first_visit_date" not in member_columns:
+            connection.exec_driver_sql("ALTER TABLE members ADD COLUMN first_visit_date TIMESTAMPTZ")
+            logger.info("Added missing members.first_visit_date column.")
+        if "visitor_status" not in member_columns:
+            connection.exec_driver_sql("ALTER TABLE members ADD COLUMN visitor_status TEXT DEFAULT 'none'")
+            logger.info("Added missing members.visitor_status column.")
+        if "member_lifecycle" not in member_columns:
+            connection.exec_driver_sql("ALTER TABLE members ADD COLUMN member_lifecycle TEXT")
+            logger.info("Added missing members.member_lifecycle column.")
+        if "last_followup_at" not in member_columns:
+            connection.exec_driver_sql("ALTER TABLE members ADD COLUMN last_followup_at TIMESTAMPTZ")
+            logger.info("Added missing members.last_followup_at column.")
+        connection.exec_driver_sql("UPDATE members SET visitor_status = 'none' WHERE visitor_status IS NULL")
         if "church_id" not in attendance_columns:
             connection.exec_driver_sql("ALTER TABLE attendance ADD COLUMN church_id INTEGER")
         if "church_id" not in risk_columns:

@@ -31,6 +31,7 @@ export default function PriorityPage() {
   const [riskScoreCount, setRiskScoreCount] = useState(0);
   const [queueRows, setQueueRows] = useState<MemberDirectoryRow[]>([]);
   const [statuses, setStatuses] = useState<OutreachStatusRecord[]>([]);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const loadStatuses = useCallback(async (id: number) => {
     const fresh = await getOutreachStatuses(id);
@@ -40,6 +41,27 @@ export default function PriorityPage() {
   const onStatusChange = useCallback(() => {
     if (churchId) void loadStatuses(churchId);
   }, [churchId, loadStatuses]);
+
+  const onVisitorFollowedUp = useCallback((memberPcoId: string, followedUpAt: string) => {
+    const matchedMember = queueRows.find((row) => row.member.pco_id === memberPcoId);
+    const followedUpDate = new Date(followedUpAt);
+
+    setQueueRows((current) =>
+      current.map((row) =>
+        row.member.pco_id === memberPcoId
+          ? {
+              ...row,
+              member: {
+                ...row.member,
+                last_followup_at: Number.isNaN(followedUpDate.getTime()) ? new Date() : followedUpDate,
+              },
+            }
+          : row,
+      ),
+    );
+    setSuccessMessage(`${matchedMember?.member.name ?? "Visitor"} marked followed up.`);
+    window.setTimeout(() => setSuccessMessage(null), 3000);
+  }, [queueRows]);
 
   useEffect(() => {
     let active = true;
@@ -109,7 +131,7 @@ export default function PriorityPage() {
           <CardContent className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3">
-                <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Total</p>
+                <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Open</p>
                 <p className="mt-1 text-2xl font-semibold">{filteredQueue.length}</p>
               </div>
               <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3">
@@ -123,9 +145,14 @@ export default function PriorityPage() {
             </div>
             <div className="rounded-lg border border-primary/25 bg-primary/8 p-3 text-sm text-muted-foreground">
               {riskScoreCount
-                ? "Focus first on critical members where no attendance has been recorded in recent weeks."
-                : "No risk scores found."}
+                ? "Focus first on critical members and visitors awaiting personal follow-up."
+                : "Visitor follow-up still appears here even before risk scoring is available."}
             </div>
+            {successMessage ? (
+              <div className="rounded-lg border border-primary/25 bg-primary/8 p-3 text-sm font-medium text-primary">
+                {successMessage}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -167,7 +194,7 @@ export default function PriorityPage() {
               ))}
               {!filteredQueue.length ? (
                 <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-4 text-sm text-muted-foreground">
-                  No risk scores found.
+                  {queueRows.length ? "No queue items match this filter." : "No active follow-up queue items."}
                 </div>
               ) : null}
             </div>
@@ -207,14 +234,15 @@ export default function PriorityPage() {
             row={row}
             churchId={churchId!}
             onStatusChange={onStatusChange}
+            onVisitorFollowedUp={onVisitorFollowedUp}
           />
         ))}
         {!filteredQueue.length ? (
           <Card>
             <CardContent className="p-6 text-center text-sm text-muted-foreground">
               {queueRows.length
-                ? "All members have been contacted or snoozed. Great work!"
-                : "No risk scores found."}
+                ? "No queue items match this filter."
+                : "No active follow-up queue items."}
             </CardContent>
           </Card>
         ) : null}

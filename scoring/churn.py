@@ -113,6 +113,15 @@ def calculate_risk(member, attendance_records=None, church_settings=None):
         "data_confidence": 0,
     }
 
+    lifecycle = str(getattr(member, "member_lifecycle", "") or "").strip().lower()
+    if lifecycle and lifecycle != "established_member":
+        return {
+            "score": 0,
+            "tier": "Healthy",
+            "reasons": ["Member lifecycle is not eligible for risk scoring"],
+            "breakdown": breakdown,
+        }
+
     main_service_frequency = _get_setting(church_settings, "main_service_frequency")
     watch_missed_services = int(_get_setting(church_settings, "watch_missed_services"))
     at_risk_missed_services = int(_get_setting(church_settings, "at_risk_missed_services"))

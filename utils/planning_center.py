@@ -250,6 +250,7 @@ def get_people(limit=10):
             "name": f"{first} {last}".strip(),
             "email": email_by_person.get(person_id) or fallback_email,
             "status": attrs.get("status"),
+            "pco_created_at": attrs.get("created_at"),
             "source": "planning_center"
         })
 
