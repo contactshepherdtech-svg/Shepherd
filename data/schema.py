@@ -64,6 +64,7 @@ class Member(Base):
     member_lifecycle = Column(String)
     last_followup_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class Attendance(Base):
@@ -179,6 +180,9 @@ def init_db():
         if "last_followup_at" not in member_columns:
             connection.exec_driver_sql("ALTER TABLE members ADD COLUMN last_followup_at TIMESTAMPTZ")
             logger.info("Added missing members.last_followup_at column.")
+        if "updated_at" not in member_columns:
+            connection.exec_driver_sql("ALTER TABLE members ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW()")
+            logger.info("Added missing members.updated_at column.")
         connection.exec_driver_sql("UPDATE members SET visitor_status = 'none' WHERE visitor_status IS NULL")
         if "church_id" not in attendance_columns:
             connection.exec_driver_sql("ALTER TABLE attendance ADD COLUMN church_id INTEGER")

@@ -42,6 +42,39 @@ export type Database = {
           member_lifecycle: string | null;
           last_followup_at: string | null;
           created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          church_id?: number | null;
+          pco_id?: string | null;
+          name?: string | null;
+          email?: string | null;
+          status?: string | null;
+          source?: string | null;
+          pco_created_at?: string | null;
+          first_visit_date?: string | null;
+          visitor_status?: string | null;
+          member_lifecycle?: string | null;
+          last_followup_at?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          church_id?: number | null;
+          pco_id?: string | null;
+          name?: string | null;
+          email?: string | null;
+          status?: string | null;
+          source?: string | null;
+          pco_created_at?: string | null;
+          first_visit_date?: string | null;
+          visitor_status?: string | null;
+          member_lifecycle?: string | null;
+          last_followup_at?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
         };
       };
       attendance: {
@@ -54,6 +87,24 @@ export type Database = {
           source: string | null;
           created_at: string | null;
         };
+        Insert: {
+          id?: number;
+          church_id?: number | null;
+          pco_checkin_id?: string | null;
+          member_pco_id?: string | null;
+          attended_at?: string | null;
+          source?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          church_id?: number | null;
+          pco_checkin_id?: string | null;
+          member_pco_id?: string | null;
+          attended_at?: string | null;
+          source?: string | null;
+          created_at?: string | null;
+        };
       };
       risk_scores: {
         Row: {
@@ -64,6 +115,24 @@ export type Database = {
           tier: string | null;
           reasons: string | null;
           updated_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          church_id?: number | null;
+          member_pco_id?: string | null;
+          score?: number | null;
+          tier?: string | null;
+          reasons?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          church_id?: number | null;
+          member_pco_id?: string | null;
+          score?: number | null;
+          tier?: string | null;
+          reasons?: string | null;
+          updated_at?: string | null;
         };
       };
       church_settings: {
