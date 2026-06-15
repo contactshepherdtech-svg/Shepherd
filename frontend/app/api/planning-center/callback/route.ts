@@ -302,5 +302,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     );
   }
 
-  return NextResponse.redirect(settingsUrl);
+  // Flag the redirect so the client auto-triggers an immediate sync once the
+  // workspace reloads (see AuthProvider's auto-sync effect).
+  return NextResponse.redirect(`${settingsUrl}?pc_connected=1`);
 }

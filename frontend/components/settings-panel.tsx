@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 
 const SLIDER_MAX = 12;
@@ -433,45 +434,33 @@ export function GmailConnectionPanel({ churchId, connection, loading = false }: 
 // ─── Sync Status ──────────────────────────────────────────────────────────────
 
 export function SyncStatusPanel({ churchId, connection, loading = false, onSyncComplete }: SyncStatusPanelProps) {
-  const [syncing, setSyncing] = useState(false);
-  const [syncMessage, setSyncMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
-  const hasLastSync = Boolean(connection?.last_sync_at);
-  const lastSync = hasLastSync ? new Date(connection!.last_sync_at as string) : null;
+  const { syncStatus, syncError, triggerSync, planningCenterConnection } = useAuth();
+
+  // Prefer the context connection (kept live by the sync poll) so counts and
+  // last-sync update during/after a run; fall back to the page-loaded prop.
+  const liveConnection = planningCenterConnection ?? connection;
+  const syncing = syncStatus === "syncing";
+
+  const hasLastSync = Boolean(liveConnection?.last_sync_at);
+  const lastSync = hasLastSync ? new Date(liveConnection!.last_sync_at as string) : null;
   const lastSyncLabel =
     hasLastSync && lastSync && !Number.isNaN(lastSync.getTime())
       ? lastSync.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
       : "Not synced yet";
 
+  // Manual sync routes through the shared trigger so it honors the in-flight
+  // guard and server-side lock. onSyncComplete refreshes the page-level data.
   const onRunSyncNow = async () => {
-    setSyncing(true);
-    setSyncMessage(null);
-
-    try {
-      if (!churchId) throw new Error("No active church found.");
-      if (!supabase) throw new Error("Supabase is not configured.");
-
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
-      if (sessionError || !accessToken) throw new Error("Sign in again before running sync.");
-
-      const response = await fetch("/api/sync", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ church_id: churchId }),
-      });
-      const result = (await response.json().catch(() => null)) as { success?: boolean; error?: string } | null;
-
-      if (!response.ok || !result?.success) throw new Error(result?.error || "Sync failed.");
-
-      await onSyncComplete();
-      setSyncMessage({ tone: "success", text: "Sync completed successfully." });
-    } catch (error) {
-      console.error("Failed to run sync", error);
-      setSyncMessage({ tone: "error", text: error instanceof Error ? error.message : "Could not run sync." });
-    } finally {
-      setSyncing(false);
-    }
+    await triggerSync();
+    await onSyncComplete();
   };
+
+  const syncMessage =
+    syncStatus === "success"
+      ? { tone: "success" as const, text: "Sync completed successfully." }
+      : syncStatus === "error"
+        ? { tone: "error" as const, text: syncError || "Sync failed." }
+        : null;
 
   return (
     <Panel
@@ -497,11 +486,11 @@ export function SyncStatusPanel({ churchId, connection, loading = false, onSyncC
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="rounded-xl border border-border/80 bg-[#FAFBFA] px-3.5 py-2.5">
             <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Members Imported</p>
-            <p className="mt-1 text-lg font-semibold">{loading ? "—" : (connection?.members_imported ?? 0)}</p>
+            <p className="mt-1 text-lg font-semibold">{loading ? "—" : (liveConnection?.members_imported ?? 0)}</p>
           </div>
           <div className="rounded-xl border border-border/80 bg-[#FAFBFA] px-3.5 py-2.5">
             <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Attendance Imported</p>
-            <p className="mt-1 text-lg font-semibold">{loading ? "—" : (connection?.attendance_imported ?? 0)}</p>
+            <p className="mt-1 text-lg font-semibold">{loading ? "—" : (liveConnection?.attendance_imported ?? 0)}</p>
           </div>
         </div>
         {syncMessage ? (

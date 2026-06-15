@@ -12,6 +12,25 @@ const PCO_PAGE_SIZE = 100;
 const DEFAULT_MAX_PCO_PAGES = 20;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// Stale-lock recovery window for the duplicate-sync guard. If the function is
+// killed at maxDuration (504 FUNCTION_INVOCATION_TIMEOUT), the completion write
+// never runs and the row stays sync_status='syncing'; the next attempt
+// re-acquires once the lock is older than this window.
+//
+// INVARIANT: this window MUST stay strictly greater than the longest a single
+// sync invocation can run, or recovery could fire a SECOND concurrent sync
+// while the first is still executing — the exact duplicate we guard against.
+//
+// Assumption (Vercel): a single invocation cannot run past `maxDuration`
+// wall-clock — the platform hard-terminates at that limit, cold-start init is
+// not counted toward it, and timed-out invocations are not auto-retried. We
+// therefore DERIVE the window from maxDuration (rather than hardcoding minutes)
+// so the invariant cannot silently break if maxDuration is raised later. The
+// 5x multiplier leaves a wide band over the execution ceiling for cold-start
+// and clock skew. (At maxDuration=60 this is 5 min.)
+const STALE_SYNC_LOCK_MULTIPLIER = 5;
+const STALE_SYNC_LOCK_MS = maxDuration * STALE_SYNC_LOCK_MULTIPLIER * 1000;
+
 const VISITOR_STATUS_FIRST_TIME = "first_time";
 const VISITOR_STATUS_RETURNED = "returned";
 const VISITOR_STATUS_CONVERTED = "converted";
@@ -902,6 +921,36 @@ async function recalculateRiskScores(
   return changed;
 }
 
+// Atomic compare-and-set duplicate-sync guard. Flips the token row to
+// sync_status='syncing' only if no sync is currently running for it (or the
+// running lock is stale per STALE_SYNC_LOCK_MS). Returns false when a live
+// sync already owns the lock, in which case the caller must NOT release it.
+async function acquireSyncLock(db: DbClient, tokenId: number): Promise<boolean> {
+  const now = new Date().toISOString();
+  const staleThreshold = new Date(Date.now() - STALE_SYNC_LOCK_MS).toISOString();
+
+  // Acquire if EITHER no sync is running (status not 'syncing', or null), OR a
+  // sync is running but its lock is stale. The staleness check is intentionally
+  // scoped to syncing rows only (via and(...)) so an old timestamp on an
+  // idle/success/error row can never be misread as a recoverable lock — the
+  // intent is explicit rather than relying on the harmless coincidence that
+  // non-syncing rows already match the first branch.
+  const { data, error } = await db
+    .from("integration_tokens")
+    .update({ sync_status: "syncing", sync_started_at: now, sync_error: null, updated_at: now } as never)
+    .eq("id", tokenId)
+    .or(
+      `sync_status.is.null,` +
+        `sync_status.neq.syncing,` +
+        `and(sync_status.eq.syncing,sync_started_at.lt.${staleThreshold})`,
+    )
+    .select("id");
+
+  assertNoSupabaseError(error, "Could not acquire sync lock");
+
+  return Boolean((data as Array<{ id: number }> | null)?.length);
+}
+
 async function updatePlanningCenterSyncStatus(
   db: DbClient,
   tokenId: number,
@@ -913,6 +962,8 @@ async function updatePlanningCenterSyncStatus(
     .from("integration_tokens")
     .update({
       connection_status: "connected",
+      sync_status: "success",
+      sync_error: null,
       last_sync_at: lastSync,
       members_imported: membersImported,
       attendance_imported: attendanceImported,
@@ -923,14 +974,20 @@ async function updatePlanningCenterSyncStatus(
   assertNoSupabaseError(error, "Could not update Planning Center sync status");
 }
 
-async function markPlanningCenterSyncError(db: DbClient | null, churchId: number | null): Promise<void> {
-  if (!db || !churchId) return;
+// Releases the lock into an error state. Critically, this does NOT touch
+// connection_status — a sync failure must not make the app think Planning
+// Center is disconnected (which would bounce the user to /settings).
+async function markPlanningCenterSyncError(
+  db: DbClient | null,
+  tokenId: number | null,
+  message: string,
+): Promise<void> {
+  if (!db || !tokenId) return;
 
   const { error } = await db
     .from("integration_tokens")
-    .update({ connection_status: "error", updated_at: new Date().toISOString() } as never)
-    .eq("church_id", churchId)
-    .eq("provider", "planning_center");
+    .update({ sync_status: "error", sync_error: message, updated_at: new Date().toISOString() } as never)
+    .eq("id", tokenId);
 
   if (error) {
     console.error("[sync] Could not mark Planning Center sync error:", error);
@@ -942,6 +999,8 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   let serviceDb: DbClient | null = null;
   let churchId: number | null = null;
+  let tokenId: number | null = null;
+  let lockAcquired = false;
 
   try {
     const resolved = await resolveAuthenticatedChurch(request);
@@ -953,6 +1012,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     let token = await loadPlanningCenterToken(serviceDb, churchId);
+    tokenId = token.id;
+
+    // Duplicate-sync guard: only one sync may run per church at a time.
+    lockAcquired = await acquireSyncLock(serviceDb, token.id);
+    if (!lockAcquired) {
+      console.log("[sync] Sync already running for church_id:", churchId);
+      return NextResponse.json(
+        { success: false, error: "A sync is already running for this church.", alreadyRunning: true },
+        { status: 409 },
+      );
+    }
+
     const planningCenterGet = await createPlanningCenterRequester(serviceDb, token);
 
     const [people, checkins] = await Promise.all([
@@ -1031,7 +1102,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     const message = err instanceof Error ? err.message : String(err);
     const status = err instanceof SyncRouteError ? err.status : 500;
     console.error("[sync] Sync failed:", message);
-    await markPlanningCenterSyncError(serviceDb, churchId);
+    // Only release the lock to an error state if we actually acquired it; a
+    // 409 (sync already running) must not clobber the owning sync's status.
+    if (lockAcquired) {
+      await markPlanningCenterSyncError(serviceDb, tokenId, message);
+    }
 
     return NextResponse.json({ success: false, error: message }, { status });
   }

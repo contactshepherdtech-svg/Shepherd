@@ -206,6 +206,9 @@ export type Database = {
           last_sync_at: string | null;
           members_imported: number | null;
           attendance_imported: number | null;
+          sync_status: string | null;
+          sync_started_at: string | null;
+          sync_error: string | null;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -222,6 +225,9 @@ export type Database = {
           last_sync_at?: string | null;
           members_imported?: number | null;
           attendance_imported?: number | null;
+          sync_status?: string | null;
+          sync_started_at?: string | null;
+          sync_error?: string | null;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -238,6 +244,9 @@ export type Database = {
           last_sync_at?: string | null;
           members_imported?: number | null;
           attendance_imported?: number | null;
+          sync_status?: string | null;
+          sync_started_at?: string | null;
+          sync_error?: string | null;
           created_at?: string | null;
           updated_at?: string | null;
         };

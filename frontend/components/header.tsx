@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { CalendarDays, CheckCircle2, Clock3, RefreshCcw, Unplug, UserCircle2 } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, Loader2, RefreshCcw, Unplug, UserCircle2 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-context";
 import { isPlanningCenterConnected } from "@/lib/data";
@@ -56,7 +56,7 @@ const routeMeta: Record<string, { title: string; subtitle: string }> = {
 export function Header() {
   const pathname = usePathname();
   const meta = routeMeta[pathname] ?? routeMeta["/dashboard"];
-  const { churchName, planningCenterConnection: connection, loading, user } = useAuth();
+  const { churchName, planningCenterConnection: connection, loading, user, syncStatus } = useAuth();
   const [todayLabel, setTodayLabel] = useState("—");
 
   useEffect(() => {
@@ -115,6 +115,26 @@ export function Header() {
             )}
             {loading ? "Loading…" : `Planning Center ${connectionStatusLabel}`}
           </span>
+          {syncStatus !== "idle" ? (
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors ${
+                syncStatus === "syncing"
+                  ? "border-primary/18 bg-primary/7 text-primary"
+                  : syncStatus === "success"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-red-200 bg-red-50 text-red-700"
+              }`}
+            >
+              {syncStatus === "syncing" ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : syncStatus === "success" ? (
+                <CheckCircle2 className="size-3.5" />
+              ) : (
+                <AlertTriangle className="size-3.5" />
+              )}
+              {syncStatus === "syncing" ? "Syncing…" : syncStatus === "success" ? "Synced" : "Sync failed"}
+            </span>
+          ) : null}
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm">
             <RefreshCcw className="size-3.5 text-primary/70" />
             {lastSyncLabel}
