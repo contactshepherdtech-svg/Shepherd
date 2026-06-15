@@ -11,10 +11,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   buildMemberDirectoryRows,
   getAttendance,
+  getGmailConnection,
   getMembers,
+  getFirstVisitFollowUpState,
   getOutreachStatuses,
+  getOutreachStatusForMember,
   getPriorityOutreachRows,
   getRiskScores,
+  isGmailConnected,
   isVisibleInQueue,
   type MemberDirectoryRow,
   type OutreachStatusRecord,
@@ -31,6 +35,7 @@ export default function PriorityPage() {
   const [riskScoreCount, setRiskScoreCount] = useState(0);
   const [queueRows, setQueueRows] = useState<MemberDirectoryRow[]>([]);
   const [statuses, setStatuses] = useState<OutreachStatusRecord[]>([]);
+  const [gmailConnected, setGmailConnected] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const loadStatuses = useCallback(async (id: number) => {
@@ -74,16 +79,18 @@ export default function PriorityPage() {
           setRiskScoreCount(0);
           setQueueRows([]);
           setStatuses([]);
+          setGmailConnected(false);
           setLoading(false);
         }
         return;
       }
 
-      const [members, attendance, riskScores, outreachStatuses] = await Promise.all([
+      const [members, attendance, riskScores, outreachStatuses, gmailConnection] = await Promise.all([
         getMembers(churchId),
         getAttendance(churchId),
         getRiskScores(churchId),
         getOutreachStatuses(churchId),
+        getGmailConnection(churchId),
       ]);
 
       if (active) {
@@ -91,6 +98,7 @@ export default function PriorityPage() {
         setRiskScoreCount(riskScores.length);
         setQueueRows(getPriorityOutreachRows(memberRows));
         setStatuses(outreachStatuses);
+        setGmailConnected(isGmailConnected(gmailConnection));
         setLoading(false);
       }
     };
@@ -109,6 +117,20 @@ export default function PriorityPage() {
   }, [queueRows, statuses, tier]);
 
   const urgentCount = filteredQueue.filter((row) => row.risk.tier === "Critical").length;
+
+  const firstVisitCounts = useMemo(() => {
+    let dueNow = 0;
+    let comingUp = 0;
+    for (const row of filteredQueue) {
+      const state = getFirstVisitFollowUpState(
+        row.member,
+        getOutreachStatusForMember(row.member.pco_id, statuses),
+      );
+      if (state === "due_now") dueNow += 1;
+      else if (state === "holding") comingUp += 1;
+    }
+    return { dueNow, comingUp };
+  }, [filteredQueue, statuses]);
 
   if (loading) {
     return (
@@ -148,6 +170,13 @@ export default function PriorityPage() {
                 ? "Focus first on critical members and visitors awaiting personal follow-up."
                 : "Visitor follow-up still appears here even before risk scoring is available."}
             </div>
+            {firstVisitCounts.dueNow || firstVisitCounts.comingUp ? (
+              <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3 text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">First-visit follow-ups</span> · Due now{" "}
+                <span className="font-semibold text-primary">{firstVisitCounts.dueNow}</span> · Coming up{" "}
+                <span className="font-semibold text-foreground">{firstVisitCounts.comingUp}</span>
+              </div>
+            ) : null}
             {successMessage ? (
               <div className="rounded-lg border border-primary/25 bg-primary/8 p-3 text-sm font-medium text-primary">
                 {successMessage}
@@ -233,6 +262,8 @@ export default function PriorityPage() {
             key={row.member.id}
             row={row}
             churchId={churchId!}
+            gmailConnected={gmailConnected}
+            outreachStatus={getOutreachStatusForMember(row.member.pco_id, statuses)}
             onStatusChange={onStatusChange}
             onVisitorFollowedUp={onVisitorFollowedUp}
           />

@@ -43,6 +43,14 @@ const visitorFollowUpLifecycles = new Set<string>([
 
 const followUpStaleAfterMs = 5 * 24 * 60 * 60 * 1000;
 
+// First-time visitors are held for 24h after their first visit before the
+// follow-up draft unlocks. Compared as absolute instants (epoch ms) against
+// first_visit_date (a UTC TIMESTAMPTZ), so it is timezone-independent.
+const FIRST_VISIT_FOLLOWUP_DELAY_MS = 24 * 60 * 60 * 1000;
+
+// Presentation state for a first-time visitor's follow-up in the queue.
+export type FirstVisitFollowUpState = "holding" | "due_now" | "draft_created";
+
 export type MemberDirectoryRow = {
   member: {
     id: string;
@@ -53,6 +61,7 @@ export type MemberDirectoryRow = {
     household: string;
     ministry: string;
     member_lifecycle: string | null;
+    first_visit_date: Date | null;
     last_followup_at: Date | null;
   };
   risk: {
@@ -167,6 +176,33 @@ export function isVisitorFollowUpDue(
   if (!parsed) return true;
 
   return parsed.getTime() < Date.now() - followUpStaleAfterMs;
+}
+
+// When a held first-time visitor's follow-up draft unlocks (first_visit + 24h).
+export function getFirstVisitFollowUpUnlocksAt(firstVisitDate: Date | null): Date | null {
+  if (!firstVisitDate) return null;
+  return new Date(firstVisitDate.getTime() + FIRST_VISIT_FOLLOWUP_DELAY_MS);
+}
+
+// Computes the queue presentation state for a FIRST-TIME visitor's follow-up.
+// Returns null for any other lifecycle (those keep the existing follow-up rules).
+//   draft_created — a Gmail draft has been prepared (outreach_status.draft_created_at)
+//   holding       — synced < 24h ago; draft intentionally held, not missing
+//   due_now       — 24h elapsed, no draft yet → offer "Generate Follow-up Draft"
+// A first_time_visitor with a missing first_visit_date is treated as due_now so
+// an inconsistent record never hides a real visitor.
+export function getFirstVisitFollowUpState(
+  member: { member_lifecycle: string | null; first_visit_date: Date | null },
+  status: OutreachStatusRecord | null,
+): FirstVisitFollowUpState | null {
+  if (member.member_lifecycle !== "first_time_visitor") return null;
+  if (status?.draft_created_at) return "draft_created";
+
+  const firstVisit = member.first_visit_date;
+  if (firstVisit && Date.now() < firstVisit.getTime() + FIRST_VISIT_FOLLOWUP_DELAY_MS) {
+    return "holding";
+  }
+  return "due_now";
 }
 
 export function getVisitorLifecycleLabel(lifecycle: string | null | undefined): string {
@@ -423,6 +459,7 @@ export function buildMemberDirectoryRows(
         household: "Congregation",
         ministry: "General Ministry",
         member_lifecycle: member.member_lifecycle ?? null,
+        first_visit_date: getSafeDate(member.first_visit_date),
         last_followup_at: getSafeDate(member.last_followup_at),
       },
       risk: {
@@ -625,6 +662,61 @@ export async function markVisitorFollowedUp(
     member_pco_id: result.member_pco_id,
     last_followup_at: result.last_followup_at,
   };
+}
+
+// Generates a follow-up email (existing /api/outreach/generate) and creates a
+// Gmail draft from it (existing /api/gmail/create-draft) — reusing both routes,
+// never sending. Passing member_pco_id lets create-draft record "Draft Created"
+// on outreach_status. Throws a clear error (e.g. Gmail not connected) for the UI.
+export async function createVisitorFollowUpDraft(input: {
+  memberPcoId: string;
+  to: string;
+}): Promise<{ draftId: string; persisted: boolean }> {
+  const client = requireSupabaseClient();
+  const accessToken = (await client.auth.getSession()).data.session?.access_token;
+  if (!accessToken) throw new Error("Your session expired. Please sign in again.");
+
+  const authHeaders = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+  };
+
+  const generateRes = await fetch("/api/outreach/generate", {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({ member_pco_id: input.memberPcoId, type: "email" }),
+  });
+  const generated = (await generateRes.json().catch(() => ({}))) as {
+    success?: boolean;
+    subject?: string;
+    body?: string;
+    error?: string;
+  };
+  if (!generateRes.ok || !generated.success || !generated.body) {
+    throw new Error(generated.error ?? "Could not generate the follow-up draft.");
+  }
+
+  const draftRes = await fetch("/api/gmail/create-draft", {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({
+      to: input.to,
+      subject: generated.subject ?? "We're so glad you visited",
+      body: generated.body,
+      member_pco_id: input.memberPcoId,
+    }),
+  });
+  const draft = (await draftRes.json().catch(() => ({}))) as {
+    success?: boolean;
+    draftId?: string;
+    persisted?: boolean;
+    error?: string;
+  };
+  if (!draftRes.ok || !draft.success || !draft.draftId) {
+    throw new Error(draft.error ?? "Could not create the Gmail draft.");
+  }
+
+  return { draftId: draft.draftId, persisted: Boolean(draft.persisted) };
 }
 
 export function isVisibleInQueue(memberPcoId: string | null, statuses: OutreachStatusRecord[]): boolean {

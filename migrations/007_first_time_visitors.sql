@@ -16,7 +16,7 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1
-    FROM pg_constraint
+    FROM pg_constraint 
     WHERE conname = 'members_visitor_status_check'
       AND conrelid = 'public.members'::regclass
   ) THEN

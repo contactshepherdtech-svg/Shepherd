@@ -285,6 +285,8 @@ export type Database = {
           contacted_at: string | null;
           snoozed_until: string | null;
           notes: string | null;
+          draft_created_at: string | null;
+          gmail_draft_id: string | null;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -296,6 +298,8 @@ export type Database = {
           contacted_at?: string | null;
           snoozed_until?: string | null;
           notes?: string | null;
+          draft_created_at?: string | null;
+          gmail_draft_id?: string | null;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -307,6 +311,8 @@ export type Database = {
           contacted_at?: string | null;
           snoozed_until?: string | null;
           notes?: string | null;
+          draft_created_at?: string | null;
+          gmail_draft_id?: string | null;
           created_at?: string | null;
           updated_at?: string | null;
         };

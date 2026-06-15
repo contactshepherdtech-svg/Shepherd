@@ -119,6 +119,58 @@ function buildRawMessage(to: string, subject: string, body: string): string {
     .replace(/=+$/, "");
 }
 
+// Best-effort: record on the member's outreach_status row that a Gmail draft was
+// prepared (so the queue can show "Draft Created"). One row per
+// church_id + member_pco_id — we update only the draft fields so an existing
+// status (contacted/snoozed) is preserved, and insert as 'active' if none exists.
+// Scoped to the resolved church, so it can never write across tenants. The draft
+// already exists in Gmail regardless, so a failure here is logged, not fatal.
+async function persistDraftCreated(
+  db: NonNullable<ReturnType<typeof getServiceRoleClient>>,
+  churchId: number,
+  memberPcoId: string,
+  draftId: string,
+): Promise<boolean> {
+  const now = new Date().toISOString();
+
+  try {
+    const { data: existing, error: selectError } = await db
+      .from("outreach_status")
+      .select("id")
+      .eq("church_id", churchId)
+      .eq("member_pco_id", memberPcoId)
+      .limit(1);
+
+    if (selectError) throw selectError;
+
+    if (existing && existing.length > 0) {
+      const { error } = await db
+        .from("outreach_status")
+        .update({ draft_created_at: now, gmail_draft_id: draftId, updated_at: now } as never)
+        .eq("id", (existing[0] as { id: number }).id);
+      if (error) throw error;
+    } else {
+      const { error } = await db
+        .from("outreach_status")
+        .insert({
+          church_id: churchId,
+          member_pco_id: memberPcoId,
+          status: "active",
+          draft_created_at: now,
+          gmail_draft_id: draftId,
+          created_at: now,
+          updated_at: now,
+        } as never);
+      if (error) throw error;
+    }
+
+    return true;
+  } catch (err) {
+    console.error("[gmail/create-draft] Could not persist draft state:", err);
+    return false;
+  }
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   const authorization = request.headers.get("authorization");
   if (!authorization) {
@@ -161,12 +213,19 @@ export async function POST(request: Request): Promise<NextResponse> {
   let to: string | undefined;
   let subject: string | undefined;
   let body: string | undefined;
+  let memberPcoId: string | undefined;
 
   try {
-    const parsed = (await request.json()) as { to?: string; subject?: string; body?: string };
+    const parsed = (await request.json()) as {
+      to?: string;
+      subject?: string;
+      body?: string;
+      member_pco_id?: string;
+    };
     to = parsed.to;
     subject = parsed.subject;
     body = parsed.body;
+    memberPcoId = parsed.member_pco_id?.trim() || undefined;
   } catch {
     return NextResponse.json({ success: false, error: "Invalid request body." }, { status: 400 });
   }
@@ -207,7 +266,14 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const draft = (await response.json()) as { id: string };
     console.log("[gmail/create-draft] Draft created for church_id:", churchId, "draft_id:", draft.id);
-    return NextResponse.json({ success: true, draftId: draft.id });
+
+    // Record "Draft Created" state for the follow-up queue when a member is given.
+    let persisted = false;
+    if (memberPcoId) {
+      persisted = await persistDraftCreated(db, churchId, memberPcoId, draft.id);
+    }
+
+    return NextResponse.json({ success: true, draftId: draft.id, persisted });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[gmail/create-draft] Fetch error:", message);

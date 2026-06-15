@@ -3,24 +3,30 @@
 import Link from "next/link";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, BellOff, CheckCircle2, Mail } from "lucide-react";
+import { ArrowRight, BellOff, CheckCircle2, Clock3, Mail, Sparkles } from "lucide-react";
 
 import { RiskBadge } from "@/components/risk-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  createVisitorFollowUpDraft,
+  getFirstVisitFollowUpState,
+  getFirstVisitFollowUpUnlocksAt,
   getVisitorLifecycleLabel,
   isVisitorFollowUpDue,
   isVisitorFollowUpLifecycle,
   markVisitorFollowedUp,
   upsertOutreachStatus,
   type MemberDirectoryRow,
+  type OutreachStatusRecord,
 } from "@/lib/data";
 import { formatDate } from "@/lib/format";
 
 type PriorityOutreachCardProps = {
   row: MemberDirectoryRow;
   churchId: number;
+  gmailConnected: boolean;
+  outreachStatus: OutreachStatusRecord | null;
   onStatusChange: () => void;
   onVisitorFollowedUp?: (memberPcoId: string, followedUpAt: string) => void;
 };
@@ -37,6 +43,8 @@ type ActionState = "idle" | "loading" | "success";
 export function PriorityOutreachCard({
   row,
   churchId,
+  gmailConnected,
+  outreachStatus,
   onStatusChange,
   onVisitorFollowedUp,
 }: PriorityOutreachCardProps) {
@@ -46,6 +54,8 @@ export function PriorityOutreachCard({
   const [visitorFollowUpState, setVisitorFollowUpState] = useState<ActionState>("idle");
   const [visitorFollowUpMessage, setVisitorFollowUpMessage] = useState<string | null>(null);
   const [visitorFollowUpError, setVisitorFollowUpError] = useState<string | null>(null);
+  const [draftState, setDraftState] = useState<ActionState>("idle");
+  const [draftError, setDraftError] = useState<string | null>(null);
 
   const isVisitor = isVisitorFollowUpLifecycle(row.member.member_lifecycle);
   const visitorFollowUpDue = isVisitorFollowUpDue(row.member.member_lifecycle, row.member.last_followup_at);
@@ -60,6 +70,19 @@ export function PriorityOutreachCard({
   const memberPcoId = row.member.pco_id;
   const isLoading = actionState === "loading";
   const isVisitorFollowUpLoading = visitorFollowUpState === "loading";
+
+  // First-time visitor follow-up: 24h hold → due → draft created.
+  const firstVisitState = getFirstVisitFollowUpState(row.member, outreachStatus);
+  const unlocksAt = getFirstVisitFollowUpUnlocksAt(row.member.first_visit_date);
+  const isDraftLoading = draftState === "loading";
+  const draftAlreadyCreated = firstVisitState === "draft_created" || draftState === "success";
+  const unlocksLabel = (() => {
+    if (!unlocksAt) return "soon";
+    const ms = unlocksAt.getTime() - Date.now();
+    if (ms <= 0) return "now";
+    const hours = Math.ceil(ms / (60 * 60 * 1000));
+    return `in ~${hours}h`;
+  })();
 
   const handleAction = async (
     action: () => Promise<void>,
@@ -106,6 +129,22 @@ export function PriorityOutreachCard({
       },
       `Snoozed for ${days} days.`,
     );
+
+  const onGenerateFollowUpDraft = async () => {
+    if (!memberPcoId) return;
+    setDraftState("loading");
+    setDraftError(null);
+
+    try {
+      await createVisitorFollowUpDraft({ memberPcoId, to: row.member.email });
+      setDraftState("success");
+      // Refresh statuses so the card reflects the persisted "Draft Created".
+      setTimeout(() => onStatusChange(), 900);
+    } catch (err) {
+      setDraftError(err instanceof Error ? err.message : "Could not create the follow-up draft.");
+      setDraftState("idle");
+    }
+  };
 
   const onMarkVisitorFollowedUp = async () => {
     if (!memberPcoId) return;
@@ -196,6 +235,70 @@ export function PriorityOutreachCard({
               </Link>
             </Button>
           </div>
+
+          {/* First-time visitor follow-up */}
+          {firstVisitState ? (
+            <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+                  First-visit follow-up
+                </p>
+                {firstVisitState === "holding" ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                    <Clock3 className="size-3.5" />
+                    Unlocks {unlocksLabel}
+                  </span>
+                ) : null}
+              </div>
+
+              {draftAlreadyCreated ? (
+                <p className="inline-flex items-center gap-1.5 text-sm text-foreground">
+                  <CheckCircle2 className="size-4 text-primary" />
+                  Draft created — review in Gmail before sending.
+                </p>
+              ) : firstVisitState === "holding" ? (
+                <p className="text-sm text-muted-foreground">
+                  Held for 24h after their first visit — the follow-up draft unlocks {unlocksLabel}.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  First visit{" "}
+                  {row.member.first_visit_date ? `was ${formatDate(row.member.first_visit_date)}` : "recorded"} —
+                  ready for a personal follow-up.
+                </p>
+              )}
+
+              <Button
+                size="sm"
+                onClick={() => void onGenerateFollowUpDraft()}
+                disabled={
+                  firstVisitState !== "due_now" ||
+                  draftAlreadyCreated ||
+                  !gmailConnected ||
+                  !memberPcoId ||
+                  !row.member.email ||
+                  isDraftLoading
+                }
+                className="w-full justify-start gap-1.5"
+              >
+                <Sparkles className="size-3.5" />
+                {isDraftLoading
+                  ? "Creating draft…"
+                  : draftAlreadyCreated
+                    ? "Draft Created"
+                    : "Generate Follow-up Draft"}
+              </Button>
+
+              {!gmailConnected ? (
+                <p className="text-xs text-muted-foreground">
+                  Gmail isn&apos;t connected for this workspace — connect it in Settings to create drafts.
+                </p>
+              ) : !row.member.email ? (
+                <p className="text-xs text-muted-foreground">No email on file for this visitor.</p>
+              ) : null}
+              {draftError ? <p className="text-xs text-red-600">{draftError}</p> : null}
+            </div>
+          ) : null}
 
           {/* Outreach workflow actions */}
           <div className="space-y-2">

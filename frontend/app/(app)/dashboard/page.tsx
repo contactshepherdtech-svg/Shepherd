@@ -16,12 +16,17 @@ import {
   getAttendanceTrend,
   getChurchHealthScore,
   getEngagementOverview,
+  getGmailConnection,
   getMembers,
+  getOutreachStatuses,
+  getOutreachStatusForMember,
   getPriorityOutreachRows,
   getRiskDistribution,
   getRiskScores,
+  isGmailConnected,
   type AttendanceRecord,
   type MemberDirectoryRow,
+  type OutreachStatusRecord,
   type RiskScoreRecord,
 } from "@/lib/data";
 import { useAuth } from "@/lib/auth-context";
@@ -33,6 +38,8 @@ export default function DashboardPage() {
   const [memberRows, setMemberRows] = useState<MemberDirectoryRow[]>([]);
   const [attendanceRows, setAttendanceRows] = useState<AttendanceRecord[]>([]);
   const [riskRows, setRiskRows] = useState<RiskScoreRecord[]>([]);
+  const [statuses, setStatuses] = useState<OutreachStatusRecord[]>([]);
+  const [gmailConnected, setGmailConnected] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -46,16 +53,20 @@ export default function DashboardPage() {
           setMemberRows([]);
           setAttendanceRows([]);
           setRiskRows([]);
+          setStatuses([]);
+          setGmailConnected(false);
           setLoading(false);
         }
         return;
       }
 
       try {
-        const [members, attendance, riskScores] = await Promise.all([
+        const [members, attendance, riskScores, outreachStatuses, gmailConnection] = await Promise.all([
           getMembers(churchId),
           getAttendance(churchId),
           getRiskScores(churchId),
+          getOutreachStatuses(churchId),
+          getGmailConnection(churchId),
         ]);
 
         if (active) {
@@ -63,6 +74,8 @@ export default function DashboardPage() {
           setMemberRows(buildMemberDirectoryRows(members, riskScores, attendance));
           setAttendanceRows(attendance);
           setRiskRows(riskScores);
+          setStatuses(outreachStatuses);
+          setGmailConnected(isGmailConnected(gmailConnection));
         }
       } catch (error) {
         console.error("Failed to load dashboard data", error);
@@ -71,6 +84,8 @@ export default function DashboardPage() {
           setMemberRows([]);
           setAttendanceRows([]);
           setRiskRows([]);
+          setStatuses([]);
+          setGmailConnected(false);
         }
       } finally {
         if (active) setLoading(false);
@@ -82,6 +97,11 @@ export default function DashboardPage() {
     return () => {
       active = false;
     };
+  }, [churchId]);
+
+  const refreshStatuses = useCallback(() => {
+    if (!churchId) return;
+    void getOutreachStatuses(churchId).then(setStatuses);
   }, [churchId]);
 
   const onVisitorFollowedUp = useCallback((memberPcoId: string, followedUpAt: string) => {
@@ -258,7 +278,9 @@ export default function DashboardPage() {
                     key={row.member.id}
                     row={row}
                     churchId={churchId ?? 0}
-                    onStatusChange={() => undefined}
+                    gmailConnected={gmailConnected}
+                    outreachStatus={getOutreachStatusForMember(row.member.pco_id, statuses)}
+                    onStatusChange={refreshStatuses}
                     onVisitorFollowedUp={onVisitorFollowedUp}
                   />
                 ))}
