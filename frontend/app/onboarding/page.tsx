@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
@@ -79,6 +79,10 @@ function OnboardingContent() {
   const [form, setForm] = useState<OnboardingWorkspaceInput>(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Synchronous lock — `saving` is read from a stale closure on a fast
+  // double-click, so it can't reliably block a second submit. A ref updates
+  // immediately and prevents firing two create-workspace requests at once.
+  const submitLock = useRef(false);
 
   useEffect(() => {
     if (loading) return;
@@ -126,7 +130,7 @@ function OnboardingContent() {
 
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!user || saving) return;
+    if (!user || saving || submitLock.current) return;
 
     const churchName = form.church_name.trim();
     if (!churchName) {
@@ -143,6 +147,7 @@ function OnboardingContent() {
       return;
     }
 
+    submitLock.current = true;
     setSaving(true);
     setError(null);
 
@@ -189,6 +194,7 @@ function OnboardingContent() {
       );
     } finally {
       setSaving(false);
+      submitLock.current = false;
     }
   };
 

@@ -113,6 +113,29 @@ export async function POST(request: Request): Promise<NextResponse> {
       .single();
 
     if (churchUserError || !churchUser) {
+      // A concurrent request may have already created this user's workspace.
+      // The unique index on church_users(user_id) (migration 010) makes the
+      // losing insert fail with a Postgres unique violation (23505) instead of
+      // creating a duplicate church. Roll back the orphan church we just created
+      // and return the workspace that won the race.
+      if (churchUserError?.code === "23505") {
+        await serviceClient.from("churches").delete().eq("id", churchRow.id);
+
+        const { data: winningRows, error: winningError } = await serviceClient
+          .from("church_users")
+          .select("church_id")
+          .eq("user_id", userData.user.id)
+          .limit(1);
+
+        const winningChurchId = (winningRows as Array<{ church_id: number }> | null)?.[0]?.church_id;
+        if (winningError || !winningChurchId) {
+          console.error("[onboarding/create-workspace] Conflict resolution lookup failed:", winningError);
+          return NextResponse.json({ success: false, error: "Could not resolve existing workspace." }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true, existing: true, church_id: winningChurchId });
+      }
+
       console.error("[onboarding/create-workspace] Church user insert failed:", churchUserError);
       await serviceClient.from("churches").delete().eq("id", churchRow.id);
       return NextResponse.json({ success: false, error: "Could not link user to workspace." }, { status: 500 });
