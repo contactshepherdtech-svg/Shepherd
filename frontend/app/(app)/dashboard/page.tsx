@@ -31,6 +31,10 @@ import {
 } from "@/lib/data";
 import { useAuth } from "@/lib/auth-context";
 
+// Usable bar height inside the 168px trend chart (minus the p-3 padding), with a
+// little headroom so the tallest normalized bar never touches the top edge.
+const CHART_USABLE_PX = 132;
+
 export default function DashboardPage() {
   const { churchId } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -133,6 +137,17 @@ export default function DashboardPage() {
   const previousWindow = attendanceTrend.slice(-8, -4).reduce((sum, row) => sum + row.records, 0);
   const trendDelta = previousWindow ? Math.round(((recentWindow - previousWindow) / previousWindow) * 100) : 0;
 
+  // Presentation-only context so sparse/empty data doesn't read as broken.
+  // risk_scores only exist for established members (scoring is gated), so its
+  // length is the scored population.
+  const scoredMemberCount = riskRows.length;
+  const hasPriorWindow = previousWindow > 0;
+  const trendValue = hasPriorWindow ? `${trendDelta >= 0 ? "+" : ""}${trendDelta}%` : "—";
+  // Max weekly records drives bar normalization; 0 across the window => empty state
+  // (and guards the normalization against divide-by-zero / NaN heights).
+  const maxWeeklyRecords = attendanceTrend.reduce((max, row) => Math.max(max, row.records), 0);
+  const hasAttendanceData = maxWeeklyRecords > 0;
+
   if (loading) {
     return (
       <PageShell>
@@ -157,16 +172,20 @@ export default function DashboardPage() {
         <MetricCard
           label="At Risk"
           value={atRiskCount}
-          supporting="Members in At Risk or Critical"
+          supporting={
+            scoredMemberCount > 0
+              ? `Of ${scoredMemberCount} established member${scoredMemberCount === 1 ? "" : "s"} scored`
+              : "No established members scored yet"
+          }
           icon={AlertTriangle}
           tone="critical"
         />
         <MetricCard
           label="Attendance Trend"
-          value={`${trendDelta >= 0 ? "+" : ""}${trendDelta}%`}
-          supporting="Compared to previous 4-week window"
+          value={trendValue}
+          supporting={hasPriorWindow ? "Compared to previous 4-week window" : "Not enough history yet"}
           icon={TrendingUp}
-          tone={trendDelta >= 0 ? "evergreen" : "gold"}
+          tone={hasPriorWindow ? (trendDelta >= 0 ? "evergreen" : "gold") : "neutral"}
         />
       </section>
 
@@ -179,7 +198,7 @@ export default function DashboardPage() {
           <CardContent className="space-y-3">
             {!riskRows.length ? (
               <p className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-4 text-sm text-muted-foreground">
-                No risk scores found.
+                No risk scores yet. Scoring covers established members only — visitors aren&apos;t scored.
               </p>
             ) : null}
             {riskDistribution.map((item) => (
@@ -199,6 +218,11 @@ export default function DashboardPage() {
                 </div>
               </div>
             ))}
+            {riskRows.length ? (
+              <p className="pt-1 text-xs text-muted-foreground">
+                Scored from {scoredMemberCount} of {totalMembers} member{totalMembers === 1 ? "" : "s"} (established only).
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -208,21 +232,34 @@ export default function DashboardPage() {
             <CardTitle>Last 12 weeks</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid h-[168px] grid-cols-12 items-end gap-1.5 rounded-xl border border-border bg-[#FAFBFA] p-3">
-              {attendanceTrend.map((point) => (
-                <div key={point.label} className="flex h-full flex-col justify-end gap-1">
-                  <div
-                    className="rounded-md bg-primary/90 transition-all duration-200 hover:bg-primary"
-                    style={{ height: `${Math.max(6, point.records * 12)}px` }}
-                    title={`${point.label}: ${point.records} records`}
-                  />
+            {hasAttendanceData ? (
+              <>
+                <div className="grid h-[168px] grid-cols-12 items-end gap-1.5 overflow-hidden rounded-xl border border-border bg-[#FAFBFA] p-3">
+                  {attendanceTrend.map((point) => (
+                    <div key={point.label} className="flex h-full flex-col justify-end">
+                      <div
+                        className="rounded-md bg-primary/90 transition-all duration-200 hover:bg-primary"
+                        style={{
+                          height:
+                            point.records > 0
+                              ? `${Math.max(4, Math.round((point.records / maxWeeklyRecords) * CHART_USABLE_PX))}px`
+                              : "0px",
+                        }}
+                        title={`${point.label}: ${point.records} records`}
+                      />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{attendanceTrend[0]?.label}</span>
-              <span>{attendanceTrend[attendanceTrend.length - 1]?.label}</span>
-            </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{attendanceTrend[0]?.label}</span>
+                  <span>{attendanceTrend[attendanceTrend.length - 1]?.label}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex h-[168px] items-center justify-center rounded-xl border border-dashed border-border bg-[#FAFBFA] p-4 text-center text-sm text-muted-foreground">
+                No attendance in the last 12 weeks yet — run a sync to populate trends.
+              </div>
+            )}
           </CardContent>
         </Card>
 
