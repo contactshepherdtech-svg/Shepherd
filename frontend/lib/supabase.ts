@@ -318,6 +318,48 @@ export type Database = {
         };
         Relationships: [];
       };
+      sync_history: {
+        Row: {
+          id: number;
+          church_id: number;
+          status: string;
+          members_imported: number | null;
+          attendance_imported: number | null;
+          risk_scores_updated: number | null;
+          lifecycle_updated: number | null;
+          error_message: string | null;
+          started_at: string | null;
+          finished_at: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          church_id: number;
+          status: string;
+          members_imported?: number | null;
+          attendance_imported?: number | null;
+          risk_scores_updated?: number | null;
+          lifecycle_updated?: number | null;
+          error_message?: string | null;
+          started_at?: string | null;
+          finished_at?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          church_id?: number;
+          status?: string;
+          members_imported?: number | null;
+          attendance_imported?: number | null;
+          risk_scores_updated?: number | null;
+          lifecycle_updated?: number | null;
+          error_message?: string | null;
+          started_at?: string | null;
+          finished_at?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [];
+      };
     };
   };
 };

@@ -994,6 +994,48 @@ async function markPlanningCenterSyncError(
   }
 }
 
+type SyncHistoryEntry = {
+  status: "success" | "failure";
+  membersImported: number | null;
+  attendanceImported: number | null;
+  riskScoresUpdated: number | null;
+  lifecycleUpdated: number | null;
+  errorMessage: string | null;
+  startedAt: string | null;
+};
+
+// Append-only per-run log (item 3). Inserted once when a run finishes. Counts
+// are passed through verbatim from the sync (null = step never reached, not 0).
+// Best-effort: never throws and never affects the response or the item-2 lock —
+// a logging failure is logged and swallowed. Service-role write (RLS bypassed).
+async function recordSyncHistory(
+  db: DbClient | null,
+  churchId: number | null,
+  entry: SyncHistoryEntry,
+): Promise<void> {
+  if (!db || !churchId) return;
+
+  try {
+    const { error } = await db.from("sync_history").insert({
+      church_id: churchId,
+      status: entry.status,
+      members_imported: entry.membersImported,
+      attendance_imported: entry.attendanceImported,
+      risk_scores_updated: entry.riskScoresUpdated,
+      lifecycle_updated: entry.lifecycleUpdated,
+      error_message: entry.errorMessage,
+      started_at: entry.startedAt,
+      finished_at: new Date().toISOString(),
+    } as never);
+
+    if (error) {
+      console.error("[sync] Could not record sync history:", error);
+    }
+  } catch (err) {
+    console.error("[sync] Could not record sync history:", err);
+  }
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   console.log("[sync] Route hit");
 
@@ -1001,6 +1043,13 @@ export async function POST(request: Request): Promise<NextResponse> {
   let churchId: number | null = null;
   let tokenId: number | null = null;
   let lockAcquired = false;
+  // Hoisted for sync_history. null (not 0) so a run that dies partway logs
+  // "never reached" for the counts it didn't get to, distinct from a real 0.
+  let runStartedAt: string | null = null;
+  let membersImported: number | null = null;
+  let attendanceImported: number | null = null;
+  let riskScoresUpdated: number | null = null;
+  let lifecycleUpdated: number | null = null;
 
   try {
     const resolved = await resolveAuthenticatedChurch(request);
@@ -1024,6 +1073,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
+    // Run has genuinely started (past the 409 guard) — mark the history start.
+    runStartedAt = new Date().toISOString();
+
     const planningCenterGet = await createPlanningCenterRequester(serviceDb, token);
 
     const [people, checkins] = await Promise.all([
@@ -1035,8 +1087,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     console.log("[sync] Attendance fetched count:", checkins.length);
 
     const lastSync = new Date().toISOString();
-    const membersImported = await upsertMembers(serviceDb, churchId, people, lastSync);
-    const attendanceImported = await upsertAttendance(serviceDb, churchId, checkins);
+    membersImported = await upsertMembers(serviceDb, churchId, people, lastSync);
+    attendanceImported = await upsertAttendance(serviceDb, churchId, checkins);
 
     const [members, attendanceRows] = await Promise.all([
       fetchAllPages<MemberForSync>(async (from, to) => {
@@ -1063,7 +1115,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     ]);
 
     const attendanceByMember = buildAttendanceByMember(attendanceRows);
-    const lifecycleUpdated = await recalculateLifecycles(
+    lifecycleUpdated = await recalculateLifecycles(
       serviceDb,
       churchId,
       members,
@@ -1072,7 +1124,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
     console.log("[sync] Lifecycle updated count:", lifecycleUpdated);
 
-    const riskScoresUpdated = await recalculateRiskScores(
+    riskScoresUpdated = await recalculateRiskScores(
       serviceDb,
       churchId,
       members,
@@ -1090,6 +1142,17 @@ export async function POST(request: Request): Promise<NextResponse> {
       attendanceImported,
     );
 
+    // Finish hook (success): append one history row. Best-effort.
+    await recordSyncHistory(serviceDb, churchId, {
+      status: "success",
+      membersImported,
+      attendanceImported,
+      riskScoresUpdated,
+      lifecycleUpdated,
+      errorMessage: null,
+      startedAt: runStartedAt,
+    });
+
     return NextResponse.json({
       success: true,
       membersImported,
@@ -1104,8 +1167,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     console.error("[sync] Sync failed:", message);
     // Only release the lock to an error state if we actually acquired it; a
     // 409 (sync already running) must not clobber the owning sync's status.
+    // Same gate for the failure history row: a run that never started (409,
+    // auth/token failure before the lock) is not logged. Counts reflect
+    // whatever steps completed before the throw (null = never reached).
     if (lockAcquired) {
       await markPlanningCenterSyncError(serviceDb, tokenId, message);
+      await recordSyncHistory(serviceDb, churchId, {
+        status: "failure",
+        membersImported,
+        attendanceImported,
+        riskScoresUpdated,
+        lifecycleUpdated,
+        errorMessage: message,
+        startedAt: runStartedAt,
+      });
     }
 
     return NextResponse.json({ success: false, error: message }, { status });

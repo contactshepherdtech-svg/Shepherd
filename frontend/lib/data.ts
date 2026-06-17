@@ -10,6 +10,7 @@ type ChurchSettingsRow = Database["public"]["Tables"]["church_settings"]["Row"];
 type ChurchSettingsUpdate = Database["public"]["Tables"]["church_settings"]["Update"];
 type IntegrationTokenRow = Database["public"]["Tables"]["integration_tokens"]["Row"];
 type OutreachStatusRow = Database["public"]["Tables"]["outreach_status"]["Row"];
+type SyncHistoryRow = Database["public"]["Tables"]["sync_history"]["Row"];
 
 export type ChurchRecord = ChurchRow;
 export type ChurchUserRecord = ChurchUserRow;
@@ -18,6 +19,7 @@ export type AttendanceRecord = AttendanceRow;
 export type RiskScoreRecord = RiskScoreRow;
 export type ChurchSettingsRecord = ChurchSettingsRow;
 export type OutreachStatusRecord = OutreachStatusRow;
+export type SyncHistoryRecord = SyncHistoryRow;
 export type EditableChurchSettings = Pick<
   ChurchSettingsRow,
   | "church_name"
@@ -378,6 +380,27 @@ export async function getPlanningCenterConnection(
   }
 
   return scopedQuery.data?.[0] ?? null;
+}
+
+export async function getSyncHistory(
+  churchId: number,
+  limit = 5,
+): Promise<SyncHistoryRecord[]> {
+  const client = requireSupabaseClient();
+
+  const { data, error } = await client
+    .from("sync_history")
+    .select("*")
+    .eq("church_id", churchId)
+    .order("finished_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    logQueryError("sync_history", error);
+    return [];
+  }
+
+  return data ?? [];
 }
 
 export async function getGmailConnection(churchId: number): Promise<GmailConnection | null> {

@@ -4,9 +4,10 @@ import type { ComponentType, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import { motion } from "framer-motion";
-import { Cable, CheckCircle2, Circle, Loader2, Mail, RefreshCcw, Settings2, Unplug } from "lucide-react";
+import { AlertTriangle, Cable, CheckCircle2, Circle, Loader2, Mail, RefreshCcw, Settings2, Unplug } from "lucide-react";
 
 import {
+  getSyncHistory,
   isGmailConnected,
   isPlanningCenterConnected,
   updateChurchSettings,
@@ -14,6 +15,7 @@ import {
   type EditableChurchSettings,
   type GmailConnection,
   type PlanningCenterConnection,
+  type SyncHistoryRecord,
 } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -435,11 +437,28 @@ export function GmailConnectionPanel({ churchId, connection, loading = false }: 
 
 export function SyncStatusPanel({ churchId, connection, loading = false, onSyncComplete }: SyncStatusPanelProps) {
   const { syncStatus, syncError, triggerSync, planningCenterConnection } = useAuth();
+  const [history, setHistory] = useState<SyncHistoryRecord[]>([]);
 
   // Prefer the context connection (kept live by the sync poll) so counts and
   // last-sync update during/after a run; fall back to the page-loaded prop.
   const liveConnection = planningCenterConnection ?? connection;
   const syncing = syncStatus === "syncing";
+
+  // Load recent runs on mount and whenever a sync finishes (syncStatus flips out
+  // of "syncing" to success/error), so the latest run shows immediately.
+  useEffect(() => {
+    if (!churchId) {
+      setHistory([]);
+      return;
+    }
+    let active = true;
+    void getSyncHistory(churchId, 5).then((rows) => {
+      if (active) setHistory(rows);
+    });
+    return () => {
+      active = false;
+    };
+  }, [churchId, syncStatus]);
 
   const hasLastSync = Boolean(liveConnection?.last_sync_at);
   const lastSync = hasLastSync ? new Date(liveConnection!.last_sync_at as string) : null;
@@ -461,6 +480,9 @@ export function SyncStatusPanel({ churchId, connection, loading = false, onSyncC
       : syncStatus === "error"
         ? { tone: "error" as const, text: syncError || "Sync failed." }
         : null;
+
+  // null = the run never reached that step; show "—" rather than a misleading 0.
+  const fmtCount = (n: number | null) => (n === null || n === undefined ? "—" : n);
 
   return (
     <Panel
@@ -502,6 +524,52 @@ export function SyncStatusPanel({ churchId, connection, loading = false, onSyncC
             }`}
           >
             {syncMessage.text}
+          </div>
+        ) : null}
+
+        {history.length ? (
+          <div className="space-y-2 pt-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Recent Syncs
+            </p>
+            <ul className="space-y-1.5">
+              {history.map((run) => {
+                const finished = run.finished_at ? new Date(run.finished_at) : null;
+                const whenLabel =
+                  finished && !Number.isNaN(finished.getTime())
+                    ? finished.toLocaleString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })
+                    : "Unknown time";
+                const isSuccess = run.status === "success";
+                return (
+                  <li key={run.id} className="rounded-xl border border-border/80 bg-[#FAFBFA] px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium">
+                        {isSuccess ? (
+                          <CheckCircle2 className="size-3.5 text-primary" />
+                        ) : (
+                          <AlertTriangle className="size-3.5 text-red-600" />
+                        )}
+                        {isSuccess ? "Success" : "Failed"}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{whenLabel}</span>
+                    </div>
+                    {isSuccess ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {fmtCount(run.members_imported)} members · {fmtCount(run.attendance_imported)} attendance ·{" "}
+                        {fmtCount(run.risk_scores_updated)} risk · {fmtCount(run.lifecycle_updated)} lifecycle
+                      </p>
+                    ) : run.error_message ? (
+                      <p className="mt-1 break-words text-xs text-red-600">{run.error_message}</p>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         ) : null}
       </div>
