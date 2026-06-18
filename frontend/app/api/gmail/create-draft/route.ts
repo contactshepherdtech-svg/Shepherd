@@ -8,7 +8,9 @@ function getServiceRoleClient() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-async function resolveChurchId(authorization: string): Promise<number | null> {
+async function resolveMembership(
+  authorization: string,
+): Promise<{ churchId: number; role: string } | null> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) return null;
@@ -26,14 +28,16 @@ async function resolveChurchId(authorization: string): Promise<number | null> {
 
   const { data: churchUsers, error } = await db
     .from("church_users")
-    .select("church_id")
+    .select("church_id, role")
     .eq("user_id", userData.user.id)
     .limit(1);
 
   if (error || !churchUsers?.length) return null;
 
-  const churchId = (churchUsers[0] as { church_id: number }).church_id;
-  return Number.isInteger(churchId) && churchId > 0 ? churchId : null;
+  const row = churchUsers[0] as { church_id: number; role: string };
+  return Number.isInteger(row.church_id) && row.church_id > 0
+    ? { churchId: row.church_id, role: row.role }
+    : null;
 }
 
 type GmailTokenRow = {
@@ -177,10 +181,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ success: false, error: "Authentication is required." }, { status: 401 });
   }
 
-  const churchId = await resolveChurchId(authorization);
-  if (!churchId) {
+  const membership = await resolveMembership(authorization);
+  if (!membership) {
     return NextResponse.json({ success: false, error: "No church workspace found for this user." }, { status: 403 });
   }
+  // Creating outreach drafts is a write action — Viewers are blocked.
+  if (membership.role !== "admin" && membership.role !== "pastor") {
+    return NextResponse.json(
+      { success: false, error: "Your role does not allow creating outreach drafts." },
+      { status: 403 },
+    );
+  }
+  const churchId = membership.churchId;
 
   const db = getServiceRoleClient();
   if (!db) {

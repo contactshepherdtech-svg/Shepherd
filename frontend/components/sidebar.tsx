@@ -19,6 +19,7 @@ import {
   Settings,
   Siren,
   Sparkles,
+  UserCog,
   Users,
 } from "lucide-react";
 
@@ -30,6 +31,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Gauge },
   { href: "/members", label: "Members", icon: Users },
   { href: "/priority", label: "Priority", icon: Siren },
+  { href: "/staff", label: "Staff", icon: UserCog },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

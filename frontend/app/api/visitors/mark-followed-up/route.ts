@@ -24,20 +24,24 @@ async function resolveAuthenticatedUser(authorization: string): Promise<{ id: st
   return { id: data.user.id };
 }
 
-async function resolveActiveChurchId(userId: string): Promise<number | null> {
+async function resolveActiveMembership(
+  userId: string,
+): Promise<{ churchId: number; role: string } | null> {
   const db = getServiceRoleClient();
   if (!db) return null;
 
   const { data, error } = await db
     .from("church_users")
-    .select("church_id")
+    .select("church_id, role")
     .eq("user_id", userId)
     .limit(1);
 
   if (error || !data?.length) return null;
 
-  const churchId = (data[0] as { church_id: number }).church_id;
-  return Number.isInteger(churchId) && churchId > 0 ? churchId : null;
+  const row = data[0] as { church_id: number; role: string };
+  return Number.isInteger(row.church_id) && row.church_id > 0
+    ? { churchId: row.church_id, role: row.role }
+    : null;
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -51,10 +55,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ success: false, error: "Authentication is required." }, { status: 401 });
   }
 
-  const churchId = await resolveActiveChurchId(user.id);
-  if (!churchId) {
+  const membership = await resolveActiveMembership(user.id);
+  if (!membership) {
     return NextResponse.json({ success: false, error: "No active church found for this user." }, { status: 403 });
   }
+  // Pastoral write action — Viewers may read but never mark follow-ups.
+  if (membership.role !== "admin" && membership.role !== "pastor") {
+    return NextResponse.json(
+      { success: false, error: "Your role does not allow marking follow-ups." },
+      { status: 403 },
+    );
+  }
+  const churchId = membership.churchId;
 
   let memberPcoId: string | undefined;
   try {

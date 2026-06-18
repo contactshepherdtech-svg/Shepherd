@@ -38,7 +38,9 @@ export default function LoginPage() {
       return;
     }
 
-    router.replace("/ask");
+    // Carry an invite token (from /invite/<token>) back to the accept flow.
+    const invite = new URLSearchParams(window.location.search).get("invite");
+    router.replace(invite ? `/invite/${invite}` : "/ask");
   };
 
   return (

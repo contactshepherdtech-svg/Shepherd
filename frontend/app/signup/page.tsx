@@ -17,6 +17,10 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
+  // Invite token carried from /invite/<token>. Captured at submit time (read from
+  // the URL in the handler, no useSearchParams → no Suspense boundary needed).
+  // When present, a new account is routed to the accept flow instead of onboarding.
+  const [invite, setInvite] = useState<string | null>(null);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +37,10 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
 
+    // Capture any invite token from the URL for post-signup routing.
+    const inviteToken = new URLSearchParams(window.location.search).get("invite");
+    setInvite(inviteToken);
+
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
@@ -46,13 +54,15 @@ export default function SignupPage() {
 
     if (!authData.session) {
       setConfirmMessage(
-        "Account created! Check your email to confirm your address, then sign in.",
+        inviteToken
+          ? "Account created! Confirm your email, then sign in to accept your invitation."
+          : "Account created! Check your email to confirm your address, then sign in.",
       );
       setLoading(false);
       return;
     }
 
-    router.replace("/onboarding");
+    router.replace(inviteToken ? `/invite/${inviteToken}` : "/onboarding");
   };
 
   if (confirmMessage) {
@@ -81,7 +91,7 @@ export default function SignupPage() {
           </div>
           <p className="text-sm font-medium text-foreground">{confirmMessage}</p>
           <Link
-            href="/login"
+            href={invite ? `/login?invite=${invite}` : "/login"}
             className="mt-4 inline-block text-sm font-medium text-primary hover:underline"
           >
             Back to sign in

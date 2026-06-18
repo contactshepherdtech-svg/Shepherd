@@ -360,6 +360,48 @@ export type Database = {
         };
         Relationships: [];
       };
+      church_invitations: {
+        Row: {
+          id: number;
+          church_id: number;
+          email: string;
+          role: string;
+          status: string;
+          invited_by: string | null;
+          invited_user_id: string | null;
+          token: string;
+          created_at: string | null;
+          expires_at: string | null;
+          accepted_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          church_id: number;
+          email: string;
+          role: string;
+          status?: string;
+          invited_by?: string | null;
+          invited_user_id?: string | null;
+          token?: string;
+          created_at?: string | null;
+          expires_at?: string | null;
+          accepted_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          church_id?: number;
+          email?: string;
+          role?: string;
+          status?: string;
+          invited_by?: string | null;
+          invited_user_id?: string | null;
+          token?: string;
+          created_at?: string | null;
+          expires_at?: string | null;
+          accepted_at?: string | null;
+        };
+        Relationships: [];
+      };
     };
   };
 };

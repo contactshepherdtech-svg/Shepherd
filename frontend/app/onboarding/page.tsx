@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InviteBanner, type PendingInvite } from "@/components/invite-banner";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import type { OnboardingWorkspaceInput } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
@@ -79,6 +80,11 @@ function OnboardingContent() {
   const [form, setForm] = useState<OnboardingWorkspaceInput>(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Pending-invite gate. "checking" until we know; church-creation UI only ever
+  // renders when this is "none". See the render branches below.
+  const [inviteState, setInviteState] = useState<"checking" | "none" | "has_invites" | "error">("checking");
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
+  const inviteCheckedRef = useRef(false);
   // Synchronous lock — `saving` is read from a stale closure on a fast
   // double-click, so it can't reliably block a second submit. A ref updates
   // immediately and prevents firing two create-workspace requests at once.
@@ -96,6 +102,60 @@ function OnboardingContent() {
       router.replace(planningCenterConnected ? "/dashboard" : "/settings");
     }
   }, [churchId, churchUser, loading, planningCenterConnected, router, user]);
+
+  // Pending-invite check. Runs once, only for a signed-in user who has NO church
+  // yet, and BEFORE the create-workspace form is ever rendered or submittable
+  // (the form is gated on inviteState === "none" below). If the user has a
+  // pending invite, the InviteBanner takes over and the create path is
+  // unreachable — invite always wins. The server (create-workspace) enforces the
+  // same rule, so this client gate is UX, not the security boundary.
+  useEffect(() => {
+    if (loading || !user) return;
+    if (churchUser && churchId) return; // handled by the redirect effect above
+    if (inviteCheckedRef.current) return;
+    inviteCheckedRef.current = true;
+
+    void (async () => {
+      try {
+        if (!supabase) {
+          setInviteState("none");
+          return;
+        }
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+        if (!accessToken) {
+          setInviteState("none");
+          return;
+        }
+        const res = await fetch("/api/staff/my-invitations", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const json = (await res.json().catch(() => null)) as
+          | { success?: boolean; invitations?: PendingInvite[] }
+          | null;
+        if (!res.ok || !json?.success) {
+          // Fail safe: do NOT fall through to church creation on an unknown
+          // state — show a retry instead, so a missed invite can't slip past.
+          setInviteState("error");
+          return;
+        }
+        const invites = json.invitations ?? [];
+        if (invites.length > 0) {
+          setPendingInvites(invites);
+          setInviteState("has_invites");
+        } else {
+          setInviteState("none");
+        }
+      } catch {
+        setInviteState("error");
+      }
+    })();
+  }, [loading, user, churchUser, churchId]);
+
+  const retryInviteCheck = () => {
+    inviteCheckedRef.current = false;
+    setInviteState("checking");
+  };
 
   const updateField = (field: keyof OnboardingWorkspaceInput, value: string | number) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -131,6 +191,9 @@ function OnboardingContent() {
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user || saving || submitLock.current) return;
+    // Defensive: the form is only rendered when inviteState === "none", but never
+    // allow a submit while a pending invite exists. The server guards this too.
+    if (inviteState !== "none") return;
 
     const churchName = form.church_name.trim();
     if (!churchName) {
@@ -210,6 +273,62 @@ function OnboardingContent() {
   }
 
   if (!user) return null;
+
+  // ---- Pending-invite gate (renders before the create-workspace form) ----
+  if (inviteState === "checking") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="flex flex-col items-center gap-3">
+          <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Checking for invitations…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (inviteState === "error") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="w-full max-w-sm space-y-4 rounded-2xl border border-border/60 bg-card p-6 text-center shadow-sm">
+          <p className="text-sm text-muted-foreground">
+            We couldn&apos;t check whether you have a pending invitation. Please try again before continuing.
+          </p>
+          <Button type="button" className="w-full" onClick={retryInviteCheck}>
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (inviteState === "has_invites") {
+    return (
+      <div className="relative flex min-h-screen items-start justify-center overflow-hidden bg-background px-4 py-10 sm:items-center">
+        <div
+          className="pointer-events-none absolute inset-0"
+          aria-hidden
+          style={{
+            background: "radial-gradient(ellipse 80% 60% at 50% 30%, rgba(0,107,85,0.08) 0%, transparent 70%)",
+          }}
+        />
+        <div className="relative z-10 w-full max-w-md space-y-7">
+          <div className="flex flex-col items-center">
+            <div style={{ filter: "drop-shadow(0 10px 28px rgba(0,107,85,0.28))" }}>
+              <Image
+                src="/shepherd-logo.png"
+                alt="Shepherd"
+                width={380}
+                height={253}
+                className="h-auto w-[300px] max-w-full"
+                priority
+              />
+            </div>
+          </div>
+          <InviteBanner invites={pendingInvites} onAllResolved={() => setInviteState("none")} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex min-h-screen items-start justify-center overflow-hidden bg-background px-4 py-10 sm:items-center">

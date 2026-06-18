@@ -64,6 +64,42 @@ export async function POST(request: Request): Promise<NextResponse> {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
+    // ============================================================
+    // HIGHEST-STAKES GUARD — invite always wins over church creation.
+    // This runs BEFORE any church/church_users/settings insert below. If the
+    // signed-in user has a live pending invitation, we refuse to create a church
+    // and tell the client to send them to the accept flow instead. Enforced
+    // SERVER-SIDE so it holds even if the client onboarding redirect is bypassed
+    // (direct API call). This is what prevents the day-one duplicate-church bug
+    // for invited users. Solo signups (no pending invite) are unaffected.
+    // ============================================================
+    const inviteEmail = userData.user.email ? userData.user.email.trim().toLowerCase() : null;
+    if (inviteEmail) {
+      const { data: pendingInvites, error: pendingError } = await serviceClient
+        .from("church_invitations")
+        .select("token")
+        .eq("email", inviteEmail)
+        .eq("status", "pending")
+        .gt("expires_at", new Date().toISOString())
+        .limit(1);
+
+      if (pendingError) {
+        console.error("[onboarding/create-workspace] Pending invite check failed:", pendingError);
+        return NextResponse.json({ success: false, error: "Could not verify invitations." }, { status: 500 });
+      }
+      if (pendingInvites?.length) {
+        return NextResponse.json(
+          {
+            success: false,
+            pending_invite: true,
+            token: (pendingInvites[0] as { token: string }).token,
+            error: "You have a pending invitation. Accept or decline it before creating a church.",
+          },
+          { status: 409 },
+        );
+      }
+    }
+
     const { data: existingChurchUsers, error: existingError } = await serviceClient
       .from("church_users")
       .select("church_id")
