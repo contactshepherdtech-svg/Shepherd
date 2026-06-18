@@ -31,6 +31,7 @@ import {
   type OutreachStatusRecord,
 } from "@/lib/data";
 import { formatDate, formatRelativeDays } from "@/lib/format";
+import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 
 type OutreachType = "email" | "sms";
@@ -134,6 +135,12 @@ export function MemberDetailPanel({
   const [visitorFollowUpMessage, setVisitorFollowUpMessage] = useState<string | null>(null);
   const [visitorFollowUpError, setVisitorFollowUpError] = useState<string | null>(null);
 
+  // Outreach is a WRITE surface — only admins/pastors may use it. Server routes
+  // (outreach generate, gmail draft, mark-followed-up) already enforce this; here
+  // we hide the whole action surface so viewers never see controls that only error.
+  const { churchUser } = useAuth();
+  const canWriteOutreach = churchUser?.role === "admin" || churchUser?.role === "pastor";
+
   // Load outreach status and Gmail connection whenever churchId changes
   useEffect(() => {
     setOutreachStatus(null);
@@ -162,9 +169,11 @@ export function MemberDetailPanel({
     return () => { active = false; };
   }, [churchId]);
 
-  // Auto-trigger email generation when navigated from "Draft Email" button
+  // Auto-trigger email generation when navigated from "Draft Email" button.
+  // Skipped for viewers — they have no generate surface and the API would 403.
   useEffect(() => {
     if (!autoGenerateEmail) return;
+    if (!canWriteOutreach) return;
     onAutoEmailTriggered?.();
     void onGenerate("email");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -579,6 +588,7 @@ export function MemberDetailPanel({
         </Card>
       </div>
 
+      {canWriteOutreach ? (
       <Card>
         <CardHeader>
           <p className="shepherd-kicker">Outreach Actions</p>
@@ -809,6 +819,7 @@ export function MemberDetailPanel({
           ) : null}
         </CardContent>
       </Card>
+      ) : null}
 
     </motion.div>
   );

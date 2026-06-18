@@ -9,6 +9,7 @@ type RiskScoreRow = Database["public"]["Tables"]["risk_scores"]["Row"];
 type ChurchSettingsRow = Database["public"]["Tables"]["church_settings"]["Row"];
 type ChurchSettingsUpdate = Database["public"]["Tables"]["church_settings"]["Update"];
 type IntegrationTokenRow = Database["public"]["Tables"]["integration_tokens"]["Row"];
+type IntegrationStatusRow = Database["public"]["Tables"]["integration_status"]["Row"];
 type OutreachStatusRow = Database["public"]["Tables"]["outreach_status"]["Row"];
 type SyncHistoryRow = Database["public"]["Tables"]["sync_history"]["Row"];
 
@@ -97,8 +98,10 @@ export type EngagementOverview = {
   disengaged: number;
 };
 
-export type PlanningCenterConnection = IntegrationTokenRecord;
-export type GmailConnection = IntegrationTokenRecord;
+// Client connection objects now come from the token-free `integration_status`
+// view — never the raw integration_tokens table (which clients can no longer read).
+export type PlanningCenterConnection = IntegrationStatusRow;
+export type GmailConnection = IntegrationStatusRow;
 
 export type OnboardingWorkspaceInput = {
   church_name: string;
@@ -367,7 +370,7 @@ export async function getPlanningCenterConnection(
   const client = requireSupabaseClient();
 
   const scopedQuery = await client
-    .from("integration_tokens")
+    .from("integration_status")
     .select("*")
     .eq("church_id", churchId)
     .eq("provider", "planning_center")
@@ -375,7 +378,7 @@ export async function getPlanningCenterConnection(
     .limit(1);
 
   if (scopedQuery.error) {
-    logQueryError("integration_tokens", scopedQuery.error);
+    logQueryError("integration_status", scopedQuery.error);
     throw scopedQuery.error;
   }
 
@@ -407,7 +410,7 @@ export async function getGmailConnection(churchId: number): Promise<GmailConnect
   const client = requireSupabaseClient();
 
   const scopedQuery = await client
-    .from("integration_tokens")
+    .from("integration_status")
     .select("*")
     .eq("church_id", churchId)
     .eq("provider", "gmail")
@@ -415,7 +418,7 @@ export async function getGmailConnection(churchId: number): Promise<GmailConnect
     .limit(1);
 
   if (scopedQuery.error) {
-    logQueryError("integration_tokens (gmail)", scopedQuery.error);
+    logQueryError("integration_status (gmail)", scopedQuery.error);
     throw scopedQuery.error;
   }
 
@@ -427,7 +430,7 @@ export function isGmailConnected(connection: GmailConnection | null): boolean {
     connection &&
       connection.connection_status === "connected" &&
       connection.provider === "gmail" &&
-      connection.access_token,
+      connection.has_access_token,
   );
 }
 
@@ -436,7 +439,7 @@ export function isPlanningCenterConnected(connection: PlanningCenterConnection |
     connection &&
       connection.connection_status === "connected" &&
       connection.provider === "planning_center" &&
-      connection.access_token,
+      connection.has_access_token,
   );
 }
 

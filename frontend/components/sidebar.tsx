@@ -42,8 +42,14 @@ const COMPACT_WIDTH = 84;
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { churchName, user, signOut } = useAuth();
+  const { churchName, user, churchUser, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+
+  // Staff is an admin-only management surface (the /api/staff/list API is also
+  // admin-gated server-side). Hide the nav entry for pastors and viewers.
+  const visibleNavItems = navItems.filter(
+    (item) => item.href !== "/staff" || churchUser?.role === "admin",
+  );
 
   // Sidebar compactness is driven solely by the manual collapse toggle. It used
   // to be coupled to window scrollY, which made the sidebar shrink/"close" as the
@@ -199,7 +205,7 @@ export function Sidebar() {
         </motion.div>
 
         <nav className="flex-1 space-y-1 py-1.5">
-          {navItems.map(({ href, label, icon: Icon }, index) => {
+          {visibleNavItems.map(({ href, label, icon: Icon }, index) => {
             const active = pathname === href;
 
             return (

@@ -21,6 +21,12 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (!caller.churchId) {
     return NextResponse.json({ success: false, error: "No active church found for this user." }, { status: 403 });
   }
+  // Admin-only: this returns the staff roster, pending-invitation emails, and
+  // invite tokens (bearer credentials). Non-admins must not receive any of it,
+  // even by calling the API directly — UI hiding alone is not sufficient.
+  if (caller.role !== "admin") {
+    return NextResponse.json({ success: false, error: "Only an admin can view staff." }, { status: 403 });
+  }
 
   const service = getServiceClient();
   if (!service) {

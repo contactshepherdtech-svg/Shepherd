@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 
 type Role = "admin" | "pastor" | "viewer";
@@ -53,6 +54,7 @@ async function authHeaders(): Promise<Record<string, string> | null> {
 }
 
 export default function StaffPage() {
+  const { churchUser } = useAuth();
   const [data, setData] = useState<ListResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -161,6 +163,19 @@ export default function StaffPage() {
       setActionError("Could not copy to clipboard.");
     }
   };
+
+  // Admin-only page. Non-admins get a clean message instead of a failing fetch;
+  // the /api/staff/list API is the real server-side boundary.
+  if (churchUser && churchUser.role !== "admin") {
+    return (
+      <div className="mx-auto max-w-md rounded-2xl border border-border/60 bg-card p-6 text-center shadow-sm">
+        <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">Staff management</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Only an admin can manage staff for this church.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

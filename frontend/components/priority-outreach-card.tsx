@@ -8,6 +8,7 @@ import { ArrowRight, BellOff, CheckCircle2, Clock3, Mail, Sparkles } from "lucid
 import { RiskBadge } from "@/components/risk-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/lib/auth-context";
 import {
   createVisitorFollowUpDraft,
   getFirstVisitFollowUpState,
@@ -56,6 +57,11 @@ export function PriorityOutreachCard({
   const [visitorFollowUpError, setVisitorFollowUpError] = useState<string | null>(null);
   const [draftState, setDraftState] = useState<ActionState>("idle");
   const [draftError, setDraftError] = useState<string | null>(null);
+
+  // Outreach is a WRITE surface — viewers don't get any of it (server already
+  // enforces; this hides the controls so they aren't shown buttons that error).
+  const { churchUser } = useAuth();
+  const canWriteOutreach = churchUser?.role === "admin" || churchUser?.role === "pastor";
 
   const isVisitor = isVisitorFollowUpLifecycle(row.member.member_lifecycle);
   const visitorFollowUpDue = isVisitorFollowUpDue(row.member.member_lifecycle, row.member.last_followup_at);
@@ -227,17 +233,19 @@ export function PriorityOutreachCard({
             ) : null}
           </div>
 
-          <div>
-            <Button variant="secondary" asChild className="justify-start gap-2">
-              <Link href={draftEmailHref}>
-                <Mail className="size-4" />
-                AI Draft Email
-              </Link>
-            </Button>
-          </div>
+          {canWriteOutreach ? (
+            <div>
+              <Button variant="secondary" asChild className="justify-start gap-2">
+                <Link href={draftEmailHref}>
+                  <Mail className="size-4" />
+                  AI Draft Email
+                </Link>
+              </Button>
+            </div>
+          ) : null}
 
           {/* First-time visitor follow-up */}
-          {firstVisitState ? (
+          {canWriteOutreach && firstVisitState ? (
             <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
@@ -301,6 +309,7 @@ export function PriorityOutreachCard({
           ) : null}
 
           {/* Outreach workflow actions */}
+          {canWriteOutreach ? (
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Outreach Actions
@@ -373,6 +382,7 @@ export function PriorityOutreachCard({
               <p className="text-xs text-red-600">{actionError}</p>
             ) : null}
           </div>
+          ) : null}
 
           <Button asChild className="w-full justify-between">
             <Link href={memberProfileHref}>

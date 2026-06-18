@@ -626,6 +626,11 @@ export function ChurchSettingsPanel({
   loading = false,
   onSettingsSaved,
 }: ChurchSettingsPanelProps) {
+  // Editing church settings is admin-only (RLS on church_settings enforces this
+  // server-side; here we disable the controls so non-admins don't see editable
+  // fields that would only error on save).
+  const { churchUser } = useAuth();
+  const canEdit = churchUser?.role === "admin";
   const initialForm = useMemo(() => buildSettingsForm(settings, churchName), [settings, churchName]);
   const [formValues, setFormValues] = useState<EditableChurchSettings>(initialForm);
   const [saving, setSaving] = useState(false);
@@ -699,12 +704,12 @@ export function ChurchSettingsPanel({
           <Button
             variant="secondary"
             onClick={() => void saveValues(buildDefaultSettings(churchName), "Defaults restored.")}
-            disabled={loading || saving || !churchId}
+            disabled={loading || saving || !churchId || !canEdit}
           >
             {saving ? <Loader2 className="size-4 animate-spin" /> : null}
             Reset Defaults
           </Button>
-          <Button onClick={() => void saveValues(formValues, "Settings saved.")} disabled={loading || saving || !churchId}>
+          <Button onClick={() => void saveValues(formValues, "Settings saved.")} disabled={loading || saving || !churchId || !canEdit}>
             {saving ? <Loader2 className="size-4 animate-spin" /> : null}
             {saving ? "Saving…" : "Save Settings"}
           </Button>
@@ -712,13 +717,18 @@ export function ChurchSettingsPanel({
       }
     >
       <div className="space-y-2 text-sm text-foreground">
+        {!canEdit ? (
+          <div className="rounded-xl border border-border/70 bg-[#FAFBFA] px-3.5 py-2.5 text-xs text-muted-foreground">
+            These settings are read-only for your role — only an admin can change them.
+          </div>
+        ) : null}
         <div className="grid gap-2 rounded-xl border border-border/80 bg-[#FAFBFA] px-3.5 py-2.5 sm:grid-cols-[160px_1fr] sm:items-center">
           <span className="text-muted-foreground">Church Name</span>
           <Input
             value={loading ? "" : (formValues.church_name ?? "")}
             onChange={(event) => onFieldChange("church_name", event.target.value)}
             placeholder={loading ? "Loading…" : "Church name"}
-            disabled={loading || saving}
+            disabled={loading || saving || !canEdit}
           />
         </div>
         <div className="grid gap-2 rounded-xl border border-border/80 bg-[#FAFBFA] px-3.5 py-2.5 sm:grid-cols-[160px_1fr] sm:items-center">
@@ -726,7 +736,7 @@ export function ChurchSettingsPanel({
           <select
             value={loading ? DEFAULT_MAIN_SERVICE_FREQUENCY : (formValues.main_service_frequency ?? DEFAULT_MAIN_SERVICE_FREQUENCY)}
             onChange={(event) => onFieldChange("main_service_frequency", event.target.value)}
-            disabled={loading || saving}
+            disabled={loading || saving || !canEdit}
             className="flex h-10 w-full rounded-lg border border-border/90 bg-card px-3 py-2 text-sm text-foreground shadow-xs transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           >
             <option value="weekly">Weekly</option>
@@ -745,7 +755,7 @@ export function ChurchSettingsPanel({
               label="Watch"
               value={loading ? DEFAULT_WATCH_MISSED_SERVICES : (formValues.watch_missed_services ?? DEFAULT_WATCH_MISSED_SERVICES)}
               onChange={setWatch}
-              disabled={loading || saving}
+              disabled={loading || saving || !canEdit}
               badgeColor="bg-yellow-100 text-yellow-800"
               description="Early monitoring"
             />
@@ -753,7 +763,7 @@ export function ChurchSettingsPanel({
               label="At Risk"
               value={loading ? DEFAULT_AT_RISK_MISSED_SERVICES : (formValues.at_risk_missed_services ?? DEFAULT_AT_RISK_MISSED_SERVICES)}
               onChange={setAtRisk}
-              disabled={loading || saving}
+              disabled={loading || saving || !canEdit}
               badgeColor="bg-orange-100 text-orange-800"
               description="Needs outreach"
             />
@@ -761,7 +771,7 @@ export function ChurchSettingsPanel({
               label="Critical"
               value={loading ? DEFAULT_CRITICAL_MISSED_SERVICES : (formValues.critical_missed_services ?? DEFAULT_CRITICAL_MISSED_SERVICES)}
               onChange={setCritical}
-              disabled={loading || saving}
+              disabled={loading || saving || !canEdit}
               badgeColor="bg-red-100 text-red-800"
               description="Urgent follow-up"
             />
@@ -774,7 +784,7 @@ export function ChurchSettingsPanel({
             value={loading ? "" : (formValues.preferred_followup_style ?? "")}
             onChange={(event) => onFieldChange("preferred_followup_style", event.target.value)}
             placeholder={loading ? "Loading…" : "e.g. soft and friendly"}
-            disabled={loading || saving}
+            disabled={loading || saving || !canEdit}
           />
         </div>
         {message ? (

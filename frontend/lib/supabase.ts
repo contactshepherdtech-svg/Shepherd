@@ -402,6 +402,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      integration_status: {
+        // Token-free, church-scoped VIEW over integration_tokens (migration: integration_status).
+        // The access_token / refresh_token columns are intentionally absent; presence is
+        // exposed only as has_access_token / has_refresh_token booleans. Select-only.
+        Row: {
+          id: number | null;
+          church_id: number | null;
+          provider: string | null;
+          connection_status: string | null;
+          connected_email: string | null;
+          expires_at: string | null;
+          scope: string | null;
+          last_sync_at: string | null;
+          members_imported: number | null;
+          attendance_imported: number | null;
+          sync_status: string | null;
+          sync_started_at: string | null;
+          sync_error: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+          has_access_token: boolean | null;
+          has_refresh_token: boolean | null;
+        };
+        Insert: { [_ in never]: never };
+        Update: { [_ in never]: never };
+        Relationships: [];
+      };
     };
   };
 };
