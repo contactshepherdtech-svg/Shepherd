@@ -99,11 +99,13 @@ export default function SettingsPage() {
             connection={connection}
             churchName={churchName}
             loading={loading}
+            onDisconnected={loadSettings}
           />
           <GmailConnectionPanel
             churchId={churchId}
             connection={gmailConnection}
             loading={loading}
+            onDisconnected={loadSettings}
           />
         </div>
       </section>

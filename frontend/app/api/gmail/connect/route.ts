@@ -73,7 +73,12 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Church access was not found." }, { status: 403 });
   }
 
-  const activeChurchId = (churchUsers[0] as { church_id: number }).church_id;
+  const churchUserRow = churchUsers[0] as { church_id: number; role: string };
+  // Connecting/reconnecting an integration changes it for the whole church — admin only.
+  if (churchUserRow.role !== "admin") {
+    return NextResponse.json({ error: "Only an admin can manage integrations." }, { status: 403 });
+  }
+  const activeChurchId = churchUserRow.church_id;
   console.log("[gmail/connect] Resolved church_id:", activeChurchId);
 
   const statePayload = base64Url(JSON.stringify({

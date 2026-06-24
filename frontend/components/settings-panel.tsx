@@ -92,11 +92,13 @@ type PlanningCenterConnectionPanelProps = SharedPanelProps & {
   churchId: number | null;
   connection: PlanningCenterConnection | null;
   churchName: string;
+  onDisconnected?: () => void | Promise<void>;
 };
 
 type GmailConnectionPanelProps = SharedPanelProps & {
   churchId: number | null;
   connection: GmailConnection | null;
+  onDisconnected?: () => void | Promise<void>;
 };
 
 type SyncStatusPanelProps = SharedPanelProps & {
@@ -245,6 +247,82 @@ export function ConnectionChecklistPanel({
   );
 }
 
+// ─── Disconnect control (admin-only) ─────────────────────────────────────────
+
+function DisconnectControl({
+  provider,
+  label,
+  connected,
+  resumeNote,
+  onDisconnected,
+}: {
+  provider: "gmail" | "planning_center";
+  label: string;
+  connected: boolean;
+  resumeNote: string;
+  onDisconnected?: () => void | Promise<void>;
+}) {
+  const { churchUser } = useAuth();
+  const isAdmin = churchUser?.role === "admin";
+  const [confirming, setConfirming] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Only admins see this, and only when there's a live connection to sever.
+  if (!connected || !isAdmin) return null;
+
+  const disconnect = async () => {
+    if (!supabase || disconnecting) return;
+    setDisconnecting(true);
+    setError(null);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+      if (!accessToken) throw new Error("Sign in again to disconnect.");
+      const res = await fetch("/api/integrations/disconnect", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ provider }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string };
+      if (!res.ok || !json.success) throw new Error(json.error ?? "Could not disconnect.");
+      setConfirming(false);
+      await onDisconnected?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not disconnect.");
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-red-200/70 bg-red-50/40 p-3">
+      {!confirming ? (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">Disconnect to switch to a different {label} account.</p>
+          <Button variant="outline" onClick={() => setConfirming(true)} disabled={disconnecting}>
+            Disconnect
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-foreground">Disconnect {label}?</p>
+          <p className="text-xs text-muted-foreground">{resumeNote}</p>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setConfirming(false)} disabled={disconnecting}>
+              Cancel
+            </Button>
+            <Button onClick={() => void disconnect()} disabled={disconnecting}>
+              {disconnecting ? "Disconnecting…" : "Confirm disconnect"}
+            </Button>
+          </div>
+        </div>
+      )}
+      {error ? <p className="mt-2 text-xs text-red-600">{error}</p> : null}
+    </div>
+  );
+}
+
 // ─── Planning Center Connection ───────────────────────────────────────────────
 
 export function PlanningCenterConnectionPanel({
@@ -252,8 +330,13 @@ export function PlanningCenterConnectionPanel({
   connection,
   churchName,
   loading = false,
+  onDisconnected,
 }: PlanningCenterConnectionPanelProps) {
   const connected = isPlanningCenterConnected(connection);
+  // Connect/Reconnect are admin-only writes (server-enforced in /connect). Hide the
+  // buttons for non-admins; the status panel below stays visible (read-only).
+  const { churchUser } = useAuth();
+  const isAdmin = churchUser?.role === "admin";
   const [startingOAuth, setStartingOAuth] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
 
@@ -297,7 +380,7 @@ export function PlanningCenterConnectionPanel({
           : "Connect Planning Center to import your members and attendance."
       }
       icon={Cable}
-      actions={
+      actions={isAdmin ? (
         <>
           <Button
             variant="secondary"
@@ -316,7 +399,7 @@ export function PlanningCenterConnectionPanel({
                 : "Connect Planning Center"}
           </Button>
         </>
-      }
+      ) : undefined}
     >
       <div className="rounded-xl border border-border/80 bg-[#FAFBFA] p-3.5 text-sm">
         <p className="inline-flex items-center gap-2 font-semibold text-foreground">
@@ -340,14 +423,25 @@ export function PlanningCenterConnectionPanel({
           {oauthError}
         </div>
       ) : null}
+      <DisconnectControl
+        provider="planning_center"
+        label="Planning Center"
+        connected={connected}
+        resumeNote="You'll need to reconnect to resume syncing. Already-synced members and attendance are kept."
+        onDisconnected={onDisconnected}
+      />
     </Panel>
   );
 }
 
 // ─── Gmail Connection ─────────────────────────────────────────────────────────
 
-export function GmailConnectionPanel({ churchId, connection, loading = false }: GmailConnectionPanelProps) {
+export function GmailConnectionPanel({ churchId, connection, loading = false, onDisconnected }: GmailConnectionPanelProps) {
   const connected = isGmailConnected(connection);
+  // Connect/Reconnect are admin-only writes (server-enforced in /connect). Hide the
+  // buttons for non-admins; the status panel below stays visible (read-only).
+  const { churchUser } = useAuth();
+  const isAdmin = churchUser?.role === "admin";
   const [startingOAuth, setStartingOAuth] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
 
@@ -391,7 +485,7 @@ export function GmailConnectionPanel({ churchId, connection, loading = false }: 
           : "Connect Gmail to send outreach drafts directly from Shepherd."
       }
       icon={Mail}
-      actions={
+      actions={isAdmin ? (
         <Button
           onClick={() => void startGmailOAuth()}
           disabled={!churchId || loading || startingOAuth}
@@ -404,7 +498,7 @@ export function GmailConnectionPanel({ churchId, connection, loading = false }: 
               ? "Reconnect Gmail"
               : "Connect Gmail"}
         </Button>
-      }
+      ) : undefined}
     >
       <div className="rounded-xl border border-border/80 bg-[#FAFBFA] p-3.5 text-sm">
         <p className="inline-flex items-center gap-2 font-semibold text-foreground">
@@ -429,6 +523,13 @@ export function GmailConnectionPanel({ churchId, connection, loading = false }: 
           {oauthError}
         </div>
       ) : null}
+      <DisconnectControl
+        provider="gmail"
+        label="Gmail"
+        connected={connected}
+        resumeNote="You'll need to reconnect to create drafts. No data is removed."
+        onDisconnected={onDisconnected}
+      />
     </Panel>
   );
 }
