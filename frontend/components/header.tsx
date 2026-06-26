@@ -104,7 +104,7 @@ export function Header() {
               loading
                 ? "border-border/80 bg-card text-muted-foreground"
                 : connected
-                  ? "border-primary/18 bg-primary/7 text-primary"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                   : "border-border/80 bg-card text-muted-foreground"
             }`}
           >
@@ -121,7 +121,7 @@ export function Header() {
             <span
               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors ${
                 syncStatus === "syncing"
-                  ? "border-primary/18 bg-primary/7 text-primary"
+                  ? "border-amber-200 bg-amber-50 text-amber-700"
                   : syncStatus === "success"
                     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                     : "border-red-200 bg-red-50 text-red-700"

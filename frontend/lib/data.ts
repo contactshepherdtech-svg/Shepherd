@@ -662,6 +662,93 @@ export async function upsertOutreachStatus(
   }
 }
 
+// The outreach pipeline state (migration 017). Distinct from the queue-suppression
+// `status` (active/contacted/snoozed) and from the assignment `done` boolean.
+export type OutreachWorkflowStatus =
+  | "new"
+  | "assigned"
+  | "in_progress"
+  | "contacted"
+  | "resolved";
+
+// Ordered for display/iteration; matches the CHECK constraint in migration 017.
+export const OUTREACH_WORKFLOW_STATUSES: OutreachWorkflowStatus[] = [
+  "new",
+  "assigned",
+  "in_progress",
+  "contacted",
+  "resolved",
+];
+
+export const OUTREACH_WORKFLOW_LABELS: Record<OutreachWorkflowStatus, string> = {
+  new: "New",
+  assigned: "Assigned",
+  in_progress: "In Progress",
+  contacted: "Contacted",
+  resolved: "Resolved",
+};
+
+// A member with no outreach_status row (or an unrecognized value) reads as "new".
+export function getWorkflowStatus(
+  status: OutreachStatusRecord | null | undefined,
+): OutreachWorkflowStatus {
+  const value = status?.workflow_status;
+  return value && (OUTREACH_WORKFLOW_STATUSES as string[]).includes(value)
+    ? (value as OutreachWorkflowStatus)
+    : "new";
+}
+
+// Sets ONLY the outreach pipeline status on a member's outreach_status row.
+// Deliberately scoped so it can never clobber the queue-suppression fields:
+//   - UPDATE path SETs exactly { workflow_status, updated_at }. A Postgres UPDATE
+//     only writes the columns named in the SET clause, so status / contacted_at /
+//     snoozed_until / notes / draft_* are left exactly as they were.
+//   - INSERT path runs ONLY when the member has no row yet (nothing to preserve);
+//     the new row gets status:'active' so the member stays queue-visible, with
+//     contacted_at / snoozed_until untouched (null by default).
+// Anon client → RLS-gated to admin+pastor by outreach_status_update/insert_staff;
+// viewers are blocked at the DB (the existing row policies, unchanged by 017).
+export async function setOutreachWorkflowStatus(
+  churchId: number,
+  memberPcoId: string,
+  workflowStatus: OutreachWorkflowStatus,
+): Promise<void> {
+  const client = requireSupabaseClient();
+  const now = new Date().toISOString();
+
+  const { data: existingRaw, error: selectError } = await client
+    .from("outreach_status")
+    .select("id")
+    .eq("church_id", churchId)
+    .eq("member_pco_id", memberPcoId)
+    .limit(1);
+  if (selectError) throw selectError;
+
+  const existing = existingRaw as Array<{ id: number }> | null;
+
+  if (existing && existing.length > 0) {
+    // Partial update — only these two columns change; siblings are preserved.
+    const { error } = await client
+      .from("outreach_status")
+      .update({ workflow_status: workflowStatus, updated_at: now } as never)
+      .eq("id", existing[0].id);
+    if (error) throw error;
+  } else {
+    // No row yet → create one, queue-visible (status:'active').
+    const { error } = await client
+      .from("outreach_status")
+      .insert({
+        church_id: churchId,
+        member_pco_id: memberPcoId,
+        status: "active",
+        workflow_status: workflowStatus,
+        created_at: now,
+        updated_at: now,
+      } as never);
+    if (error) throw error;
+  }
+}
+
 export async function markVisitorFollowedUp(
   memberPcoId: string,
 ): Promise<{ member_pco_id: string; last_followup_at: string }> {

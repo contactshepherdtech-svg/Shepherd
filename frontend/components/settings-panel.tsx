@@ -221,19 +221,19 @@ export function ConnectionChecklistPanel({
                 transition={{ delay: 0.08 + i * 0.07, duration: 0.32 }}
                 className={`flex items-start gap-3 rounded-xl border p-3.5 transition-colors ${
                   item.done
-                    ? "border-primary/22 bg-primary/6"
+                    ? "border-emerald-200 bg-emerald-50"
                     : "border-border/70 bg-[#FAFBFA]"
                 }`}
               >
                 {loading ? (
                   <Circle className="mt-0.5 size-4 shrink-0 text-muted-foreground/40" />
                 ) : item.done ? (
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
                 ) : (
                   <Circle className="mt-0.5 size-4 shrink-0 text-muted-foreground/50" />
                 )}
                 <div>
-                  <p className={`text-sm font-medium ${item.done ? "text-primary" : "text-foreground"}`}>
+                  <p className={`text-sm font-medium ${item.done ? "text-emerald-700" : "text-foreground"}`}>
                     {item.label}
                   </p>
                   <p className="text-xs text-muted-foreground">{item.description}</p>
@@ -404,7 +404,7 @@ export function PlanningCenterConnectionPanel({
       <div className="rounded-xl border border-border/80 bg-[#FAFBFA] p-3.5 text-sm">
         <p className="inline-flex items-center gap-2 font-semibold text-foreground">
           {connected ? (
-            <CheckCircle2 className="size-4 text-primary" />
+            <CheckCircle2 className="size-4 text-emerald-600" />
           ) : (
             <Unplug className="size-4 text-muted-foreground" />
           )}
@@ -503,7 +503,7 @@ export function GmailConnectionPanel({ churchId, connection, loading = false, on
       <div className="rounded-xl border border-border/80 bg-[#FAFBFA] p-3.5 text-sm">
         <p className="inline-flex items-center gap-2 font-semibold text-foreground">
           {connected ? (
-            <CheckCircle2 className="size-4 text-primary" />
+            <CheckCircle2 className="size-4 text-emerald-600" />
           ) : (
             <Unplug className="size-4 text-muted-foreground" />
           )}
@@ -651,7 +651,7 @@ export function SyncStatusPanel({ churchId, connection, loading = false, onSyncC
                     <div className="flex items-center justify-between gap-2">
                       <span className="inline-flex items-center gap-1.5 text-xs font-medium">
                         {isSuccess ? (
-                          <CheckCircle2 className="size-3.5 text-primary" />
+                          <CheckCircle2 className="size-3.5 text-emerald-600" />
                         ) : (
                           <AlertTriangle className="size-3.5 text-red-600" />
                         )}
@@ -857,7 +857,7 @@ export function ChurchSettingsPanel({
               value={loading ? DEFAULT_WATCH_MISSED_SERVICES : (formValues.watch_missed_services ?? DEFAULT_WATCH_MISSED_SERVICES)}
               onChange={setWatch}
               disabled={loading || saving || !canEdit}
-              badgeColor="bg-yellow-100 text-yellow-800"
+              badgeColor="bg-amber-100 text-amber-800"
               description="Early monitoring"
             />
             <ThresholdSlider

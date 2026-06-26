@@ -282,6 +282,7 @@ export type Database = {
           church_id: number | null;
           member_pco_id: string;
           status: string;
+          workflow_status: string;
           contacted_at: string | null;
           snoozed_until: string | null;
           notes: string | null;
@@ -295,6 +296,7 @@ export type Database = {
           church_id?: number | null;
           member_pco_id: string;
           status?: string;
+          workflow_status?: string;
           contacted_at?: string | null;
           snoozed_until?: string | null;
           notes?: string | null;
@@ -308,6 +310,7 @@ export type Database = {
           church_id?: number | null;
           member_pco_id?: string;
           status?: string;
+          workflow_status?: string;
           contacted_at?: string | null;
           snoozed_until?: string | null;
           notes?: string | null;

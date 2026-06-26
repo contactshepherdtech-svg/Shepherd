@@ -5,6 +5,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, BellOff, CheckCircle2, Clock3, Mail, Sparkles } from "lucide-react";
 
+import { OutreachStatusBadge } from "@/components/outreach-status-badge";
 import { RiskBadge } from "@/components/risk-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,8 +19,13 @@ import {
   isVisitorFollowUpLifecycle,
   markVisitorFollowedUp,
   upsertOutreachStatus,
+  setOutreachWorkflowStatus,
+  getWorkflowStatus,
+  OUTREACH_WORKFLOW_STATUSES,
+  OUTREACH_WORKFLOW_LABELS,
   type MemberDirectoryRow,
   type OutreachStatusRecord,
+  type OutreachWorkflowStatus,
 } from "@/lib/data";
 import { formatDate } from "@/lib/format";
 
@@ -57,6 +63,8 @@ export function PriorityOutreachCard({
   const [visitorFollowUpError, setVisitorFollowUpError] = useState<string | null>(null);
   const [draftState, setDraftState] = useState<ActionState>("idle");
   const [draftError, setDraftError] = useState<string | null>(null);
+  const [workflowSaving, setWorkflowSaving] = useState(false);
+  const [workflowError, setWorkflowError] = useState<string | null>(null);
 
   // Outreach is a WRITE surface — viewers don't get any of it (server already
   // enforces; this hides the controls so they aren't shown buttons that error).
@@ -171,6 +179,22 @@ export function PriorityOutreachCard({
     }
   };
 
+  // Workflow status uses its own state (not handleAction) so changing it never
+  // disables the Mark Contacted / Snooze actions — those stay independent.
+  const onChangeWorkflowStatus = async (status: OutreachWorkflowStatus) => {
+    if (!memberPcoId) return;
+    setWorkflowSaving(true);
+    setWorkflowError(null);
+    try {
+      await setOutreachWorkflowStatus(churchId, memberPcoId, status);
+      onStatusChange();
+    } catch (err) {
+      setWorkflowError(err instanceof Error ? err.message : "Could not update the workflow status.");
+    } finally {
+      setWorkflowSaving(false);
+    }
+  };
+
   return (
     <motion.div
       layout
@@ -188,7 +212,10 @@ export function PriorityOutreachCard({
               <CardTitle>{row.member.name}</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">{row.member.email || "No email on file"}</p>
             </div>
-            {row.risk.tier ? <RiskBadge tier={row.risk.tier} /> : null}
+            <div className="flex flex-col items-end gap-2">
+              {row.risk.tier ? <RiskBadge tier={row.risk.tier} /> : null}
+              <OutreachStatusBadge status={getWorkflowStatus(outreachStatus)} />
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -314,6 +341,22 @@ export function PriorityOutreachCard({
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Outreach Actions
             </p>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Workflow status</label>
+              <select
+                className="h-9 w-full rounded-lg border border-border/90 bg-card px-2 text-sm text-foreground focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none disabled:opacity-50"
+                value={getWorkflowStatus(outreachStatus)}
+                disabled={workflowSaving || !memberPcoId}
+                onChange={(e) => void onChangeWorkflowStatus(e.target.value as OutreachWorkflowStatus)}
+              >
+                {OUTREACH_WORKFLOW_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {OUTREACH_WORKFLOW_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+              {workflowError ? <p className="text-xs text-red-600">{workflowError}</p> : null}
+            </div>
             {isVisitor ? (
               <div className="space-y-2">
                 <Button

@@ -199,7 +199,7 @@ export default function AssignmentsPage() {
                     <td className="py-2 pr-3">
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          item.done ? "bg-muted text-muted-foreground" : "bg-primary/12 text-primary"
+                          item.done ? "bg-emerald-50 text-emerald-700" : "bg-muted text-muted-foreground"
                         }`}
                       >
                         {item.done ? "Done" : "Open"}

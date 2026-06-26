@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { AssignmentCard } from "@/components/assignment-card";
+import { OutreachStatusBadge } from "@/components/outreach-status-badge";
 import { RiskBadge } from "@/components/risk-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,8 +29,13 @@ import {
   isGmailConnected,
   markVisitorFollowedUp,
   upsertOutreachStatus,
+  setOutreachWorkflowStatus,
+  getWorkflowStatus,
+  OUTREACH_WORKFLOW_STATUSES,
+  OUTREACH_WORKFLOW_LABELS,
   type MemberDirectoryRow,
   type OutreachStatusRecord,
+  type OutreachWorkflowStatus,
 } from "@/lib/data";
 import { formatDate, formatRelativeDays } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
@@ -235,6 +241,14 @@ export function MemberDetailPanel({
     );
   };
 
+  const onChangeWorkflowStatus = (status: OutreachWorkflowStatus) => {
+    if (!churchId || !row.member.pco_id) return;
+    void handleOutreachAction(
+      () => setOutreachWorkflowStatus(churchId, row.member.pco_id!, status),
+      "Workflow status updated.",
+    );
+  };
+
   const attendanceTrend = useMemo(() => getAttendanceTrend(row.attendance_history), [row.attendance_history]);
   const attendanceBuckets = useMemo(
     () => buildAttendanceBuckets(row.attendance_history),
@@ -397,6 +411,7 @@ export function MemberDetailPanel({
               <span className="rounded-full border border-border/80 bg-[#F3F5F4] px-2.5 py-1 text-xs font-medium text-foreground">
                 {row.member.status}
               </span>
+              <OutreachStatusBadge status={getWorkflowStatus(outreachStatus)} />
               {row.risk.tier ? (
                 <RiskBadge tier={row.risk.tier} />
               ) : (
@@ -702,6 +717,21 @@ export function MemberDetailPanel({
                   <BellOff className="size-3.5" />
                   Snooze 30 Days
                 </Button>
+              </div>
+              <div className="space-y-1.5 pt-1">
+                <label className="text-xs font-medium text-muted-foreground">Workflow status</label>
+                <select
+                  className="h-9 w-full rounded-lg border border-border/90 bg-card px-2 text-sm text-foreground focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none disabled:opacity-50"
+                  value={getWorkflowStatus(outreachStatus)}
+                  disabled={outreachActionState === "loading"}
+                  onChange={(e) => onChangeWorkflowStatus(e.target.value as OutreachWorkflowStatus)}
+                >
+                  {OUTREACH_WORKFLOW_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {OUTREACH_WORKFLOW_LABELS[s]}
+                    </option>
+                  ))}
+                </select>
               </div>
               {outreachMessage ? (
                 <p className="text-xs font-medium text-primary">{outreachMessage}</p>
