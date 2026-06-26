@@ -1,12 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Filter, ListTodo, Phone, Sparkles } from "lucide-react";
+import { Filter } from "lucide-react";
 
 import { PageShell } from "@/components/page-shell";
 import { PriorityOutreachCard } from "@/components/priority-outreach-card";
 import { RiskBadge } from "@/components/risk-badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   buildMemberDirectoryRows,
@@ -144,7 +143,7 @@ export default function PriorityPage() {
 
   return (
     <PageShell>
-      <section className="grid gap-4 lg:grid-cols-[1.1fr_1fr_1fr]">
+      <section className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
         <Card>
           <CardHeader>
             <p className="shepherd-kicker">Queue Summary</p>
@@ -227,31 +226,6 @@ export default function PriorityPage() {
                 </div>
               ) : null}
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <p className="shepherd-kicker">Team Actions</p>
-            <CardTitle>Quick operational actions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Button className="w-full justify-start gap-2">
-              <ListTodo className="size-4" />
-              Assign Follow-up Owner
-            </Button>
-            <Button variant="secondary" className="w-full justify-start gap-2">
-              <Phone className="size-4" />
-              Plan Call Block
-            </Button>
-            <Button variant="secondary" className="w-full justify-start gap-2">
-              <AlertTriangle className="size-4" />
-              Flag Urgent Care Cases
-            </Button>
-            <Button variant="secondary" className="w-full justify-start gap-2">
-              <Sparkles className="size-4" />
-              Draft Outreach Batch
-            </Button>
           </CardContent>
         </Card>
       </section>
