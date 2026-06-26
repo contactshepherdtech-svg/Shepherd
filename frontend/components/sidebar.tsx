@@ -11,29 +11,11 @@ import {
   useMotionValueEvent,
   useTransform,
 } from "framer-motion";
-import {
-  Gauge,
-  LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Settings,
-  Siren,
-  Sparkles,
-  UserCog,
-  Users,
-} from "lucide-react";
+import { LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-context";
+import { filterNavItems } from "@/lib/nav";
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { href: "/ask", label: "Ask", icon: Sparkles },
-  { href: "/dashboard", label: "Dashboard", icon: Gauge },
-  { href: "/members", label: "Members", icon: Users },
-  { href: "/priority", label: "Priority", icon: Siren },
-  { href: "/staff", label: "Staff", icon: UserCog },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
 
 const COLLAPSE_STORAGE_KEY = "shepherd-sidebar-collapsed";
 const EXPANDED_WIDTH = 240;
@@ -45,11 +27,9 @@ export function Sidebar() {
   const { churchName, user, churchUser, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
-  // Staff is an admin-only management surface (the /api/staff/list API is also
-  // admin-gated server-side). Hide the nav entry for pastors and viewers.
-  const visibleNavItems = navItems.filter(
-    (item) => item.href !== "/staff" || churchUser?.role === "admin",
-  );
+  // Visible nav items (Staff is admin-only). Shared with the mobile drawer via
+  // filterNavItems so the gate can't drift between the two navs.
+  const visibleNavItems = filterNavItems(churchUser?.role);
 
   // Sidebar compactness is driven solely by the manual collapse toggle. It used
   // to be coupled to window scrollY, which made the sidebar shrink/"close" as the

@@ -1,0 +1,19 @@
+{
+  // Stops VS Code's file watcher, search index, and TypeScript server from
+  // scanning huge generated folders (node_modules, .next). Watching ~39,000
+  // constantly-changing files is the usual cause of runaway memory/CPU & freezes.
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.next/**": true,
+    "**/.git/objects/**": true,
+    "**/dist/**": true,
+    "**/build/**": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.next": true
+  },
+  "files.exclude": {
+    "**/.next": true
+  }
+}

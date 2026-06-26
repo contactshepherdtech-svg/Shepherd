@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, Loader2, RefreshCcw, Unplug, UserCircle2 } from "lucide-react";
 
+import { MobileNav } from "@/components/mobile-nav";
 import { useAuth } from "@/lib/auth-context";
 import { isPlanningCenterConnected } from "@/lib/data";
 
@@ -85,6 +86,7 @@ export function Header() {
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
         className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"
       >
+        <MobileNav />
         <div>
           <div className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_0_4px_rgba(0,107,85,0.10)]" />

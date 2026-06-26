@@ -1,0 +1,17 @@
+{
+  // Same exclusions, in case you open the `frontend` folder directly in VS Code.
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.next/**": true,
+    "**/.git/objects/**": true,
+    "**/dist/**": true,
+    "**/build/**": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.next": true
+  },
+  "files.exclude": {
+    "**/.next": true
+  }
+}
