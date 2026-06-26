@@ -402,6 +402,68 @@ export type Database = {
         };
         Relationships: [];
       };
+      assignments: {
+        Row: {
+          id: number;
+          church_id: number;
+          member_id: number;
+          owner_user_id: string | null;
+          due_date: string | null;
+          done: boolean;
+          done_at: string | null;
+          created_by: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          church_id: number;
+          member_id: number;
+          owner_user_id?: string | null;
+          due_date?: string | null;
+          done?: boolean;
+          done_at?: string | null;
+          created_by?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          church_id?: number;
+          member_id?: number;
+          owner_user_id?: string | null;
+          due_date?: string | null;
+          done?: boolean;
+          done_at?: string | null;
+          created_by?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+      // T2 note, isolated in its own table so RLS gates note visibility at the ROW
+      // level (viewers get zero rows). Keyed 1:1 to assignments by assignment_id.
+      assignment_notes: {
+        Row: {
+          assignment_id: number;
+          church_id: number;
+          note: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          assignment_id: number;
+          church_id: number;
+          note?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          assignment_id?: number;
+          church_id?: number;
+          note?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
       integration_status: {
         // Token-free, church-scoped VIEW over integration_tokens (migration: integration_status).
         // The access_token / refresh_token columns are intentionally absent; presence is

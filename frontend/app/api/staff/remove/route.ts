@@ -84,5 +84,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ success: false, error: "Could not remove the staff member." }, { status: 500 });
   }
 
+  // Don't let this person's OPEN assignments silently die — null their owner so
+  // they resurface as "Unassigned" on the team board for an admin to re-home.
+  // Completed rows keep their owner (the history of who did the follow-up).
+  const { error: unassignError } = await service
+    .from("assignments")
+    .update({ owner_user_id: null, updated_at: new Date().toISOString() } as never)
+    .eq("church_id", caller.churchId)
+    .eq("owner_user_id", targetUserId)
+    .eq("done", false);
+
+  if (unassignError) {
+    // The removal itself succeeded; log and continue rather than failing the request.
+    console.error("[staff/remove] Failed to unassign open assignments:", unassignError);
+  }
+
   return NextResponse.json({ success: true });
 }

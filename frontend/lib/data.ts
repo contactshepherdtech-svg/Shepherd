@@ -57,6 +57,9 @@ export type FirstVisitFollowUpState = "holding" | "due_now" | "draft_created";
 export type MemberDirectoryRow = {
   member: {
     id: string;
+    // True integer members.id (PK). `id` above carries pco_id || String(id) for
+    // display/keying; db_id is the real FK target the assign form must post.
+    db_id: number;
     pco_id: string | null;
     name: string;
     email: string;
@@ -478,6 +481,7 @@ export function buildMemberDirectoryRows(
     acc.push({
       member: {
         id: memberId,
+        db_id: member.id,
         pco_id: member.pco_id,
         name: member.name?.trim() || "Unknown member",
         email: member.email?.trim() || "",

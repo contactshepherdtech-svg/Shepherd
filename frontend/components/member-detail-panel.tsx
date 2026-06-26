@@ -15,6 +15,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import { AssignmentCard } from "@/components/assignment-card";
 import { RiskBadge } from "@/components/risk-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -587,6 +588,12 @@ export function MemberDetailPanel({
           </CardContent>
         </Card>
       </div>
+
+      <AssignmentCard
+        memberDbId={row.member.db_id}
+        memberName={row.member.name}
+        churchId={churchId}
+      />
 
       {canWriteOutreach ? (
       <Card>

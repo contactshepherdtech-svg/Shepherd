@@ -1,4 +1,4 @@
-import { Gauge, Settings, Siren, Sparkles, UserCog, Users, type LucideIcon } from "lucide-react";
+import { Gauge, ListChecks, Settings, Siren, Sparkles, UserCog, Users, type LucideIcon } from "lucide-react";
 
 export type NavItem = {
   href: string;
@@ -14,6 +14,7 @@ export const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: Gauge },
   { href: "/members", label: "Members", icon: Users },
   { href: "/priority", label: "Priority", icon: Siren },
+  { href: "/assignments", label: "Assignments", icon: ListChecks },
   { href: "/staff", label: "Staff", icon: UserCog },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
