@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { AuthGuard } from "@/components/auth-guard";
 import { Header } from "@/components/header";
+import { MyTasksWidget } from "@/components/my-tasks-widget";
 import { Sidebar } from "@/components/sidebar";
 import { AuthProvider } from "@/lib/auth-context";
 
@@ -19,6 +20,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               </main>
             </div>
           </div>
+          <MyTasksWidget />
         </div>
       </AuthGuard>
     </AuthProvider>
