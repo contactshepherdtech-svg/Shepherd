@@ -146,7 +146,10 @@ export default function DashboardPage() {
   // Max weekly records drives bar normalization; 0 across the window => empty state
   // (and guards the normalization against divide-by-zero / NaN heights).
   const maxWeeklyRecords = attendanceTrend.reduce((max, row) => Math.max(max, row.records), 0);
-  const hasAttendanceData = maxWeeklyRecords > 0;
+  const weeksWithData = attendanceTrend.filter((row) => row.records > 0).length;
+  // A single lone bar reads as "broken" even though it's correct — require at least
+  // two weeks of data before showing the chart; below that, show a building state.
+  const hasEnoughTrend = weeksWithData >= 2;
 
   if (loading) {
     return (
@@ -161,7 +164,12 @@ export default function DashboardPage() {
   return (
     <PageShell>
       <section className="grid gap-4 xl:grid-cols-[1.15fr_1fr_1fr_1fr]">
-        <ChurchHealthGauge score={healthScore} />
+        <ChurchHealthGauge
+          score={healthScore}
+          scoredCount={scoredMemberCount}
+          totalCount={totalMembers}
+          needsAttention={atRiskCount}
+        />
         <MetricCard
           label="Total Members"
           value={totalMembers}
@@ -220,7 +228,7 @@ export default function DashboardPage() {
             ))}
             {riskRows.length ? (
               <p className="pt-1 text-xs text-muted-foreground">
-                Scored from {scoredMemberCount} of {totalMembers} member{totalMembers === 1 ? "" : "s"} (established only).
+                {scoredMemberCount} of {totalMembers} member{totalMembers === 1 ? "" : "s"} scored — risk scoring covers established members; newer members and visitors aren&apos;t scored yet.
               </p>
             ) : null}
           </CardContent>
@@ -228,11 +236,11 @@ export default function DashboardPage() {
 
         <Card className="shepherd-elevate">
           <CardHeader>
-            <p className="shepherd-kicker">Attendance Trend</p>
+            <p className="shepherd-kicker">Weekly Attendance</p>
             <CardTitle>Last 12 weeks</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {hasAttendanceData ? (
+            {hasEnoughTrend ? (
               <>
                 <div className="grid h-[168px] grid-cols-12 items-end gap-1.5 overflow-hidden rounded-xl border border-border bg-[#FAFBFA] p-3">
                   {attendanceTrend.map((point) => (
@@ -256,8 +264,13 @@ export default function DashboardPage() {
                 </div>
               </>
             ) : (
-              <div className="flex h-[168px] items-center justify-center rounded-xl border border-dashed border-border bg-[#FAFBFA] p-4 text-center text-sm text-muted-foreground">
-                No attendance in the last 12 weeks yet — run a sync to populate trends.
+              <div className="flex h-[168px] flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border bg-[#FAFBFA] p-4 text-center text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Not enough data for a trend yet</span>
+                <span className="text-xs">
+                  {weeksWithData === 0
+                    ? "No attendance recorded in the last 12 weeks — run a sync to populate trends."
+                    : `Only ${weeksWithData} week of attendance so far — the trend appears once there are a few weeks.`}
+                </span>
               </div>
             )}
           </CardContent>
