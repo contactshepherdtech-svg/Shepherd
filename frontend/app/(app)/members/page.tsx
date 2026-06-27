@@ -132,7 +132,7 @@ function MembersContent() {
 
   return (
     <PageShell>
-      <section className="grid gap-4 xl:grid-cols-[400px_1fr]">
+      <section className="grid gap-4 xl:grid-cols-[340px_1fr]">
         <Card className="xl:h-[calc(100vh-178px)] xl:overflow-hidden">
           <CardHeader className="border-b border-border bg-white/92 backdrop-blur">
             <p className="shepherd-kicker">Members</p>

@@ -7,6 +7,7 @@ import {
   BellOff,
   Check,
   CheckCircle2,
+  ChevronDown,
   ClipboardList,
   Copy,
   Mail,
@@ -257,6 +258,7 @@ export function MemberDetailPanel({
 
   const recentAttendance = row.attendance_history.slice(0, 6);
   const recommendedAction = row.risk.tier ? tierActionMap[row.risk.tier] : "No action available until scoring runs";
+  const whyHeadline = row.risk.tier ? tierPlainEnglishMap[row.risk.tier] : missingRiskExplanation;
   const isVisitor = isVisitorFollowUpLifecycle(row.member.member_lifecycle);
   const visitorFollowUpDue = isVisitorFollowUpDue(row.member.member_lifecycle, visitorFollowUpAt);
   const lastFollowUpLabel = visitorFollowUpAt ? formatDate(visitorFollowUpAt) : "Not followed up";
@@ -398,11 +400,16 @@ export function MemberDetailPanel({
       transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
       className="space-y-4"
     >
+      {/* Header — name, the plain-English "why" pulled up as the headline, then pills. */}
       <Card>
         <CardHeader className="pb-3">
           <p className="shepherd-kicker">Member 360</p>
           <CardTitle className="text-xl">{row.member.name}</CardTitle>
-          <div className="space-y-2 text-sm text-muted-foreground">
+          <p className="mt-2 flex items-start gap-2 text-sm leading-6 text-foreground">
+            <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" />
+            <span>{whyHeadline}</span>
+          </p>
+          <div className="mt-2 space-y-2 text-sm text-muted-foreground">
             <p className="inline-flex items-center gap-2">
               <Mail className="size-4" />
               {row.member.email || "No email on file"}
@@ -440,424 +447,392 @@ export function MemberDetailPanel({
         </CardHeader>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <p className="shepherd-kicker">Risk Analysis</p>
-          <CardTitle>{row.risk.tier ? `Why this member is in ${row.risk.tier}` : "No risk score available"}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-border/80 bg-[#F7F8F7] p-3">
-              <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Risk score</p>
-              <p className="mt-1 font-heading text-2xl font-semibold">{row.risk.score ?? "No score"}</p>
-            </div>
-            <div className="rounded-lg border border-border/80 bg-[#F7F8F7] p-3">
-              <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Tier</p>
-              <div className="mt-1">
-                {row.risk.tier ? (
-                  <RiskBadge tier={row.risk.tier} />
-                ) : (
-                  <span className="rounded-full border border-border/80 bg-[#FAFBFA] px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                    No risk score available
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Reasons</p>
-            {row.risk.reasons.length ? (
-              <ul className="mt-2 space-y-1 text-sm text-foreground">
-                {row.risk.reasons.map((reason) => (
-                  <li key={reason}>• {reason}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground">No risk reasons available yet.</p>
-            )}
-          </div>
-          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm leading-6 text-foreground">
-            <p className="inline-flex items-center gap-2 font-semibold">
-              <Sparkles className="size-4 text-primary" />
-              Plain-English explanation
-            </p>
-            <p className="mt-2 text-muted-foreground">
-              {row.risk.tier ? tierPlainEnglishMap[row.risk.tier] : missingRiskExplanation}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <p className="shepherd-kicker">Attendance Timeline</p>
-          <CardTitle>Last 90 days activity</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-border/80 bg-[#F7F8F7] p-3">
-              <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Total attendance</p>
-              <p className="mt-1 font-heading text-2xl font-semibold">{row.attendance_count}</p>
-            </div>
-            <div className="rounded-lg border border-border/80 bg-[#F7F8F7] p-3">
-              <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Last attended</p>
-              <p className="mt-1 text-sm font-semibold text-foreground">{formatDate(row.last_attended)}</p>
-            </div>
-          </div>
-
-          {row.attendance_history.length ? (
-            <div className="rounded-lg border border-border/80 bg-card p-4">
-              <div className="flex items-end gap-2">
-                {attendanceBuckets.map((bucket) => (
-                  <div key={bucket.label} className="flex flex-1 flex-col items-center gap-2">
-                    <div className="flex h-24 w-full items-end rounded-md bg-[#F3F5F4] p-1">
-                      <div
-                        className="w-full rounded-sm bg-primary"
-                        style={{
-                          height: `${Math.max(8, bucket.count * 18)}px`,
-                          opacity: bucket.count ? 0.9 : 0.25,
-                        }}
-                      />
-                    </div>
-                    <span className="text-[11px] text-muted-foreground">{bucket.label}</span>
+      {/* Two-pane workspace: WHO THEY ARE (left, scrolls) | WHAT YOU DO (right, sticky).
+          On mobile the panes stack with ACTIONS FIRST via the order swap. */}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+        {/* LEFT — analysis */}
+        <div className="order-2 space-y-4 xl:order-1">
+          {/* Merged Engagement card — score + tier + days-since + trend + sparkline. */}
+          <Card>
+            <CardHeader>
+              <p className="shepherd-kicker">Engagement</p>
+              <CardTitle>Engagement snapshot</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-lg border border-border/80 bg-[#F7F8F7] p-3">
+                  <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Risk score</p>
+                  <p className="mt-1 font-heading text-2xl font-semibold">{row.risk.score ?? "—"}</p>
+                </div>
+                <div className="rounded-lg border border-border/80 bg-[#F7F8F7] p-3">
+                  <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Tier</p>
+                  <div className="mt-1">
+                    {row.risk.tier ? (
+                      <RiskBadge tier={row.risk.tier} />
+                    ) : (
+                      <span className="text-sm text-muted-foreground">No score</span>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-6 text-center">
-              <p className="text-sm font-semibold text-foreground">No attendance history</p>
-              <p className="mt-1 text-sm text-muted-foreground">Attendance records will appear here after sync.</p>
-            </div>
-          )}
-
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              Recent attendance dates
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {recentAttendance.length ? (
-                recentAttendance.map((date) => (
-                  <span
-                    key={date.toISOString()}
-                    className="rounded-full border border-border/80 bg-[#F7F8F7] px-2.5 py-1 text-xs text-foreground"
-                  >
-                    {formatDate(date)}
-                  </span>
-                ))
-              ) : (
-                <span className="text-sm text-muted-foreground">No attendance history</span>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <p className="shepherd-kicker">Engagement Summary</p>
-            <CardTitle>Current engagement snapshot</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex items-center justify-between rounded-lg border border-border/80 bg-[#FAFBFA] px-3 py-2">
-              <span className="text-muted-foreground">Attendance count</span>
-              <span className="font-semibold">{row.attendance_count}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-border/80 bg-[#FAFBFA] px-3 py-2">
-              <span className="text-muted-foreground">Days since last attendance</span>
-              <span className="font-semibold">{formatRelativeDays(row.days_since_last_attendance)}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-border/80 bg-[#FAFBFA] px-3 py-2">
-              <span className="text-muted-foreground">Attendance trend</span>
-              <span className="font-semibold">{attendanceTrend}</span>
-            </div>
-            {isVisitor ? (
-              <div className="flex items-center justify-between rounded-lg border border-border/80 bg-[#FAFBFA] px-3 py-2">
-                <span className="text-muted-foreground">Last Follow-Up</span>
-                <span className="font-semibold">{lastFollowUpLabel}</span>
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <p className="shepherd-kicker">Recommended Action</p>
-            <CardTitle>Next best follow-up step</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-              <p className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
-                <ShieldAlert className="size-4" />
-                Tier-based action
-              </p>
-              <p className="mt-2 text-sm text-foreground">{recommendedAction}</p>
-            </div>
-            <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-4">
-              <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Operational note</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Coordinate outreach through the member’s ministry lead to preserve relationship continuity.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <AssignmentCard
-        memberDbId={row.member.db_id}
-        memberName={row.member.name}
-        churchId={churchId}
-      />
-
-      {canWriteOutreach ? (
-      <Card>
-        <CardHeader>
-          <p className="shepherd-kicker">Outreach Actions</p>
-          <CardTitle>Generate communication drafts</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isVisitor && churchId && row.member.pco_id ? (
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    Visitor Follow-Up
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-foreground">
-                    {getVisitorLifecycleLabel(row.member.member_lifecycle)} - Last Follow-Up {lastFollowUpLabel}
+                </div>
+                <div className="rounded-lg border border-border/80 bg-[#F7F8F7] p-3">
+                  <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Last attended</p>
+                  <p className="mt-1 text-sm font-semibold text-foreground">
+                    {formatRelativeDays(row.days_since_last_attendance)}
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => void onMarkVisitorFollowedUp()}
-                  disabled={
-                    visitorFollowUpState === "loading" ||
-                    visitorFollowUpState === "success" ||
-                    !visitorFollowUpDue
-                  }
-                  className="justify-start gap-1.5"
-                >
-                  <CheckCircle2 className="size-3.5" />
-                  {visitorFollowUpState === "loading"
-                    ? "Saving..."
-                    : visitorFollowUpState === "success" || !visitorFollowUpDue
-                      ? "Followed Up"
-                      : "Mark Visitor Followed Up"}
-                </Button>
+                <div className="rounded-lg border border-border/80 bg-[#F7F8F7] p-3">
+                  <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Trend</p>
+                  <p className="mt-1 text-sm font-semibold text-foreground">{attendanceTrend}</p>
+                </div>
               </div>
-              {visitorFollowUpMessage ? (
-                <p className="mt-2 text-xs font-medium text-primary">{visitorFollowUpMessage}</p>
-              ) : null}
-              {visitorFollowUpError ? (
-                <p className="mt-2 text-xs text-red-600">{visitorFollowUpError}</p>
-              ) : null}
-            </div>
-          ) : null}
 
-          {/* Current outreach status badge */}
-          {outreachStatus && outreachStatus.status !== "active" ? (
-            <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3 text-sm">
-              {outreachStatus.status === "contacted" ? (
-                <p className="inline-flex items-center gap-2 font-semibold text-primary">
-                  <CheckCircle2 className="size-4" />
-                  Contacted
-                  {outreachStatus.contacted_at
-                    ? ` on ${new Date(outreachStatus.contacted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-                    : ""}
+              {row.attendance_history.length ? (
+                <div className="rounded-lg border border-border/80 bg-card p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      Last 90 days
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {row.attendance_count} total · last {formatDate(row.last_attended)}
+                    </p>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    {attendanceBuckets.map((bucket) => (
+                      <div key={bucket.label} className="flex flex-1 flex-col items-center gap-2">
+                        <div className="flex h-20 w-full items-end rounded-md bg-[#F3F5F4] p-1">
+                          <div
+                            className="w-full rounded-sm bg-primary"
+                            style={{
+                              height: `${Math.max(8, bucket.count * 18)}px`,
+                              opacity: bucket.count ? 0.9 : 0.25,
+                            }}
+                          />
+                        </div>
+                        <span className="text-[11px] text-muted-foreground">{bucket.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-6 text-center">
+                  <p className="text-sm font-semibold text-foreground">No attendance history</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Attendance records will appear here after sync.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Secondary — full reasons + attendance dates, collapsed by default. */}
+          <details className="group rounded-2xl border border-border/70 bg-card">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-4 text-sm font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+              <span className="inline-flex items-center gap-2">
+                <ClipboardList className="size-4 text-primary" />
+                Risk reasons &amp; attendance history
+              </span>
+              <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="space-y-3 border-t border-border/60 px-5 py-4">
+              <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Reasons</p>
+                {row.risk.reasons.length ? (
+                  <ul className="mt-2 space-y-1 text-sm text-foreground">
+                    {row.risk.reasons.map((reason) => (
+                      <li key={reason}>• {reason}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-sm text-muted-foreground">No risk reasons available yet.</p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Recent attendance dates
                 </p>
-              ) : outreachStatus.status === "snoozed" && outreachStatus.snoozed_until ? (
-                <p className="inline-flex items-center gap-2 font-semibold text-muted-foreground">
-                  <BellOff className="size-4" />
-                  Snoozed until{" "}
-                  {new Date(outreachStatus.snoozed_until).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-
-          {/* Mark Contacted / Snooze buttons */}
-          {churchId && row.member.pco_id ? (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                Outreach Status
-              </p>
-              <div className="grid gap-2 sm:grid-cols-3">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={onMarkContacted}
-                  disabled={outreachActionState === "loading" || outreachStatus?.status === "contacted"}
-                  className="justify-start gap-1.5"
-                >
-                  <CheckCircle2 className="size-3.5" />
-                  {outreachActionState === "loading" ? "Saving..." : "Mark Contacted"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => onSnooze(7)}
-                  disabled={outreachActionState === "loading"}
-                  className="justify-start gap-1.5"
-                >
-                  <BellOff className="size-3.5" />
-                  Snooze 7 Days
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => onSnooze(30)}
-                  disabled={outreachActionState === "loading"}
-                  className="justify-start gap-1.5"
-                >
-                  <BellOff className="size-3.5" />
-                  Snooze 30 Days
-                </Button>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {recentAttendance.length ? (
+                    recentAttendance.map((date) => (
+                      <span
+                        key={date.toISOString()}
+                        className="rounded-full border border-border/80 bg-[#F7F8F7] px-2.5 py-1 text-xs text-foreground"
+                      >
+                        {formatDate(date)}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-sm text-muted-foreground">No attendance history</span>
+                  )}
+                </div>
               </div>
-              <div className="space-y-1.5 pt-1">
-                <label className="text-xs font-medium text-muted-foreground">Workflow status</label>
-                <select
-                  className="h-9 w-full rounded-lg border border-border/90 bg-card px-2 text-sm text-foreground focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none disabled:opacity-50"
-                  value={getWorkflowStatus(outreachStatus)}
-                  disabled={outreachActionState === "loading"}
-                  onChange={(e) => onChangeWorkflowStatus(e.target.value as OutreachWorkflowStatus)}
-                >
-                  {OUTREACH_WORKFLOW_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {OUTREACH_WORKFLOW_LABELS[s]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {outreachMessage ? (
-                <p className="text-xs font-medium text-primary">{outreachMessage}</p>
-              ) : null}
-              {outreachError ? (
-                <p className="text-xs text-red-600">{outreachError}</p>
-              ) : null}
             </div>
-          ) : null}
+          </details>
+        </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Button
-              onClick={() => void onGenerate("email")}
-              disabled={generating !== null}
-              className="justify-start gap-2"
-            >
-              <Mail className="size-4" />
-              {generating === "email" ? "Generating..." : "Generate Email"}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => void onGenerate("sms")}
-              disabled={generating !== null}
-              className="justify-start gap-2"
-            >
-              <MessageSquare className="size-4" />
-              {generating === "sms" ? "Generating..." : "Generate SMS"}
-            </Button>
+        {/* RIGHT — actions (sticky on desktop; first on mobile). */}
+        <aside className="order-1 space-y-4 xl:order-2 xl:sticky xl:top-[96px] xl:self-start">
+          {/* The one useful line from the old Recommended Action, next to the controls. */}
+          <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm">
+            <span className="inline-flex items-center gap-1.5 font-semibold text-primary">
+              <ShieldAlert className="size-4" />
+              Recommended next step:
+            </span>{" "}
+            <span className="text-foreground">{recommendedAction}</span>
           </div>
 
-          <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-4">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Activity className="size-4 text-primary" />
-                Draft preview
-              </p>
-              {draft ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => void onCopy()}
-                  className="gap-1.5"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="size-3" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="size-3" />
-                      Copy
-                    </>
-                  )}
-                </Button>
-              ) : null}
-            </div>
-            {generating ? (
-              <p className="text-sm text-muted-foreground">Generating draft...</p>
-            ) : draft ? (
-              <div className="space-y-2">
-                {draft.type === "email" && draft.subject ? (
-                  <p className="text-sm font-semibold text-foreground">Subject: {draft.subject}</p>
-                ) : null}
-                <pre className="shepherd-scrollbar max-h-64 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 text-muted-foreground">
-                  {draft.body}
-                </pre>
-                <p className="text-xs text-muted-foreground/70">
-                  {draft.source === "openrouter"
-                    ? `Generated by OpenRouter · Model: ${draft.model ?? "unknown"}`
-                    : "Generated by Fallback Template"}
-                </p>
-                {draft.type === "email" ? (
-                  <div className="space-y-2 pt-1">
-                    {gmailConnected === false ? (
-                      <p className="text-xs text-muted-foreground">
-                        Connect Gmail in Settings first.
-                      </p>
-                    ) : (
+          {canWriteOutreach ? (
+            <Card>
+              <CardHeader>
+                <p className="shepherd-kicker">Outreach Actions</p>
+                <CardTitle>Generate communication drafts</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {isVisitor && churchId && row.member.pco_id ? (
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                          Visitor Follow-Up
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-foreground">
+                          {getVisitorLifecycleLabel(row.member.member_lifecycle)} - Last Follow-Up {lastFollowUpLabel}
+                        </p>
+                      </div>
                       <Button
                         size="sm"
-                        variant="secondary"
-                        onClick={() => void onCreateGmailDraft()}
-                        disabled={gmailConnected !== true || gmailStatus === "creating" || gmailStatus === "success"}
-                        className="gap-1.5"
+                        onClick={() => void onMarkVisitorFollowedUp()}
+                        disabled={
+                          visitorFollowUpState === "loading" ||
+                          visitorFollowUpState === "success" ||
+                          !visitorFollowUpDue
+                        }
+                        className="justify-start gap-1.5"
                       >
-                        {gmailStatus === "creating" ? (
-                          <>
-                            <ClipboardList className="size-3" />
-                            Creating draft...
-                          </>
-                        ) : gmailStatus === "success" ? (
-                          <>
-                            <Check className="size-3" />
-                            Draft created in Gmail
-                          </>
-                        ) : (
-                          <>
-                            <ClipboardList className="size-3" />
-                            Create Gmail Draft
-                          </>
-                        )}
+                        <CheckCircle2 className="size-3.5" />
+                        {visitorFollowUpState === "loading"
+                          ? "Saving..."
+                          : visitorFollowUpState === "success" || !visitorFollowUpDue
+                            ? "Followed Up"
+                            : "Mark Visitor Followed Up"}
                       </Button>
-                    )}
-                    {gmailStatus === "error" && gmailError ? (
-                      <p className="text-xs text-red-600">{gmailError}</p>
+                    </div>
+                    {visitorFollowUpMessage ? (
+                      <p className="mt-2 text-xs font-medium text-primary">{visitorFollowUpMessage}</p>
+                    ) : null}
+                    {visitorFollowUpError ? (
+                      <p className="mt-2 text-xs text-red-600">{visitorFollowUpError}</p>
                     ) : null}
                   </div>
                 ) : null}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Generate Email or SMS to preview outreach content.
-              </p>
-            )}
-          </div>
 
-          {draftError ? (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {draftError}
-            </div>
+                {/* Current outreach status badge */}
+                {outreachStatus && outreachStatus.status !== "active" ? (
+                  <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3 text-sm">
+                    {outreachStatus.status === "contacted" ? (
+                      <p className="inline-flex items-center gap-2 font-semibold text-primary">
+                        <CheckCircle2 className="size-4" />
+                        Contacted
+                        {outreachStatus.contacted_at
+                          ? ` on ${new Date(outreachStatus.contacted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                          : ""}
+                      </p>
+                    ) : outreachStatus.status === "snoozed" && outreachStatus.snoozed_until ? (
+                      <p className="inline-flex items-center gap-2 font-semibold text-muted-foreground">
+                        <BellOff className="size-4" />
+                        Snoozed until{" "}
+                        {new Date(outreachStatus.snoozed_until).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {/* Mark Contacted / Snooze + workflow status */}
+                {churchId && row.member.pco_id ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      Outreach Status
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={onMarkContacted}
+                        disabled={outreachActionState === "loading" || outreachStatus?.status === "contacted"}
+                        className="justify-start gap-1.5"
+                      >
+                        <CheckCircle2 className="size-3.5" />
+                        {outreachActionState === "loading" ? "Saving..." : "Mark Contacted"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => onSnooze(7)}
+                        disabled={outreachActionState === "loading"}
+                        className="justify-start gap-1.5"
+                      >
+                        <BellOff className="size-3.5" />
+                        Snooze 7 Days
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => onSnooze(30)}
+                        disabled={outreachActionState === "loading"}
+                        className="justify-start gap-1.5"
+                      >
+                        <BellOff className="size-3.5" />
+                        Snooze 30 Days
+                      </Button>
+                    </div>
+                    <div className="space-y-1.5 pt-1">
+                      <label className="text-xs font-medium text-muted-foreground">Workflow status</label>
+                      <select
+                        className="h-9 w-full rounded-lg border border-border/90 bg-card px-2 text-sm text-foreground focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none disabled:opacity-50"
+                        value={getWorkflowStatus(outreachStatus)}
+                        disabled={outreachActionState === "loading"}
+                        onChange={(e) => onChangeWorkflowStatus(e.target.value as OutreachWorkflowStatus)}
+                      >
+                        {OUTREACH_WORKFLOW_STATUSES.map((s) => (
+                          <option key={s} value={s}>
+                            {OUTREACH_WORKFLOW_LABELS[s]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {outreachMessage ? (
+                      <p className="text-xs font-medium text-primary">{outreachMessage}</p>
+                    ) : null}
+                    {outreachError ? (
+                      <p className="text-xs text-red-600">{outreachError}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Button
+                    onClick={() => void onGenerate("email")}
+                    disabled={generating !== null}
+                    className="justify-start gap-2"
+                  >
+                    <Mail className="size-4" />
+                    {generating === "email" ? "Generating..." : "Generate Email"}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => void onGenerate("sms")}
+                    disabled={generating !== null}
+                    className="justify-start gap-2"
+                  >
+                    <MessageSquare className="size-4" />
+                    {generating === "sms" ? "Generating..." : "Generate SMS"}
+                  </Button>
+                </div>
+
+                <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <Activity className="size-4 text-primary" />
+                      Draft preview
+                    </p>
+                    {draft ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => void onCopy()}
+                        className="gap-1.5"
+                      >
+                        {copied ? (
+                          <>
+                            <Check className="size-3" />
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="size-3" />
+                            Copy
+                          </>
+                        )}
+                      </Button>
+                    ) : null}
+                  </div>
+                  {generating ? (
+                    <p className="text-sm text-muted-foreground">Generating draft...</p>
+                  ) : draft ? (
+                    <div className="space-y-2">
+                      {draft.type === "email" && draft.subject ? (
+                        <p className="text-sm font-semibold text-foreground">Subject: {draft.subject}</p>
+                      ) : null}
+                      <pre className="shepherd-scrollbar max-h-64 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 text-muted-foreground">
+                        {draft.body}
+                      </pre>
+                      <p className="text-xs text-muted-foreground/70">
+                        {draft.source === "openrouter"
+                          ? `Generated by OpenRouter · Model: ${draft.model ?? "unknown"}`
+                          : "Generated by Fallback Template"}
+                      </p>
+                      {draft.type === "email" ? (
+                        <div className="space-y-2 pt-1">
+                          {gmailConnected === false ? (
+                            <p className="text-xs text-muted-foreground">
+                              Connect Gmail in Settings first.
+                            </p>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => void onCreateGmailDraft()}
+                              disabled={gmailConnected !== true || gmailStatus === "creating" || gmailStatus === "success"}
+                              className="gap-1.5"
+                            >
+                              {gmailStatus === "creating" ? (
+                                <>
+                                  <ClipboardList className="size-3" />
+                                  Creating draft...
+                                </>
+                              ) : gmailStatus === "success" ? (
+                                <>
+                                  <Check className="size-3" />
+                                  Draft created in Gmail
+                                </>
+                              ) : (
+                                <>
+                                  <ClipboardList className="size-3" />
+                                  Create Gmail Draft
+                                </>
+                              )}
+                            </Button>
+                          )}
+                          {gmailStatus === "error" && gmailError ? (
+                            <p className="text-xs text-red-600">{gmailError}</p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Generate Email or SMS to preview outreach content.
+                    </p>
+                  )}
+                </div>
+
+                {draftError ? (
+                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {draftError}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
           ) : null}
-        </CardContent>
-      </Card>
-      ) : null}
 
+          <AssignmentCard
+            memberDbId={row.member.db_id}
+            memberName={row.member.name}
+            churchId={churchId}
+          />
+        </aside>
+      </div>
     </motion.div>
   );
 }
