@@ -199,6 +199,45 @@
     background-color: var(--surface-2);
   }
 
+  /* Attendance line draw-on (member detail "Last 90 days" chart). The polyline sets
+     pathLength=1 so dasharray 1 == the whole path regardless of the stretched width; the
+     keyframe sweeps stroke-dashoffset 1 -> 0 (draws left-to-right) and the area fades in.
+     Base state is fully drawn (offset 0) so the line is never hidden if the animation
+     can't run. Re-fires on member switch via the SVG's keyed remount. */
+  @keyframes shepherd-line-draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes shepherd-area-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  .attendance-line {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+    animation: shepherd-line-draw 0.8s ease-out backwards;
+  }
+  .attendance-area {
+    animation: shepherd-area-fade 0.8s ease-out backwards;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .attendance-line,
+    .attendance-area {
+      animation: none;
+    }
+    .attendance-line {
+      stroke-dashoffset: 0;
+    }
+  }
+
   /* LEGIBILITY RULE (one source of truth): muted-gray text is for SOLID surfaces only.
      On glass chrome it sits on a translucent surface and slides toward the AA floor, so
      darken any muted text to a foreground tint here. */

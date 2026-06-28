@@ -549,15 +549,26 @@ export function MemberDetailPanel({
                       {row.attendance_count} total · last {formatDate(row.last_attended)}
                     </p>
                   </div>
+                  {/* key={member.id} remounts on member switch so the CSS draw-on replays
+                      every time, not just first mount. pathLength=1 normalizes the dash so
+                      the .attendance-line keyframe draws regardless of the stretched width. */}
                   <svg
+                    key={row.member.id}
                     viewBox="0 0 100 100"
                     preserveAspectRatio="none"
                     className="h-20 w-full text-primary"
                     aria-hidden="true"
                   >
-                    <path d={attendanceLine.area} fill="currentColor" fillOpacity={0.1} />
+                    <path
+                      className="attendance-area"
+                      d={attendanceLine.area}
+                      fill="currentColor"
+                      fillOpacity={0.1}
+                    />
                     <polyline
+                      className="attendance-line"
                       points={attendanceLine.line}
+                      pathLength={1}
                       fill="none"
                       stroke="currentColor"
                       strokeWidth={2}
