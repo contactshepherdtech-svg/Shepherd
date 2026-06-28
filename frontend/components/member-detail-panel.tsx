@@ -261,6 +261,25 @@ export function MemberDetailPanel({
     [row.attendance_history],
   );
 
+  // Line-graph geometry over the SAME 6 buckets (viewBox 0..100, baseline y=92, points
+  // at column centers so they align with the labels below). preserveAspectRatio="none"
+  // stretches to width; non-scaling-stroke keeps the line crisp. All-zero buckets give a
+  // flat line at the baseline — reads as "no recent attendance", not broken.
+  const attendanceLine = useMemo(() => {
+    const n = attendanceBuckets.length;
+    const max = Math.max(...attendanceBuckets.map((b) => b.count), 1);
+    const pts = attendanceBuckets.map((b, i) => ({
+      x: ((i + 0.5) / n) * 100,
+      y: 92 - (b.count / max) * 84,
+    }));
+    const line = pts.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ");
+    const area =
+      `M ${pts[0].x.toFixed(2)},92 ` +
+      pts.map((p) => `L ${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ") +
+      ` L ${pts[n - 1].x.toFixed(2)},92 Z`;
+    return { line, area };
+  }, [attendanceBuckets]);
+
   const recentAttendance = row.attendance_history.slice(0, 6);
   const recommendedAction = row.risk.tier ? tierActionMap[row.risk.tier] : "No action available until scoring runs";
   const whyHeadline = row.risk.tier ? tierPlainEnglishMap[row.risk.tier] : missingRiskExplanation;
@@ -530,20 +549,31 @@ export function MemberDetailPanel({
                       {row.attendance_count} total · last {formatDate(row.last_attended)}
                     </p>
                   </div>
-                  <div className="flex items-end gap-2">
+                  <svg
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                    className="h-20 w-full text-primary"
+                    aria-hidden="true"
+                  >
+                    <path d={attendanceLine.area} fill="currentColor" fillOpacity={0.1} />
+                    <polyline
+                      points={attendanceLine.line}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </svg>
+                  <div className="mt-2 flex">
                     {attendanceBuckets.map((bucket) => (
-                      <div key={bucket.label} className="flex flex-1 flex-col items-center gap-2">
-                        <div className="flex h-20 w-full items-end rounded-md bg-[#F3F5F4] p-1">
-                          <div
-                            className="w-full rounded-sm bg-primary"
-                            style={{
-                              height: `${Math.max(8, bucket.count * 18)}px`,
-                              opacity: bucket.count ? 0.9 : 0.25,
-                            }}
-                          />
-                        </div>
-                        <span className="text-[11px] text-muted-foreground">{bucket.label}</span>
-                      </div>
+                      <span
+                        key={bucket.label}
+                        className="flex-1 text-center text-[11px] text-muted-foreground"
+                      >
+                        {bucket.label}
+                      </span>
                     ))}
                   </div>
                 </div>
