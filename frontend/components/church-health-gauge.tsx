@@ -3,12 +3,14 @@
 import { motion } from "framer-motion";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 type ChurchHealthGaugeProps = {
   score: number;
   scoredCount: number;
   totalCount: number;
   needsAttention: number; // At Risk + Critical among scored members
+  className?: string;
 };
 
 type Tier = "Healthy" | "Watch" | "At Risk" | "Critical";
@@ -26,7 +28,7 @@ function tierForScore(score: number): Tier {
   return score >= 75 ? "Healthy" : score >= 55 ? "Watch" : score >= 35 ? "At Risk" : "Critical";
 }
 
-export function ChurchHealthGauge({ score, scoredCount, totalCount, needsAttention }: ChurchHealthGaugeProps) {
+export function ChurchHealthGauge({ score, scoredCount, totalCount, needsAttention, className }: ChurchHealthGaugeProps) {
   const clamped = Math.min(100, Math.max(0, score));
   const radius = 56;
   const circumference = Math.PI * radius;
@@ -46,14 +48,19 @@ export function ChurchHealthGauge({ score, scoredCount, totalCount, needsAttenti
       whileHover={{ y: -3 }}
       className="h-full"
     >
-      <Card className="h-full overflow-hidden transition-all duration-200 hover:border-primary/12 hover:shadow-[0_18px_44px_rgba(17,24,39,0.10)]">
+      <Card
+        className={cn(
+          "h-full overflow-hidden transition-all duration-200 hover:border-primary/12 hover:shadow-[0_18px_44px_rgba(17,24,39,0.10)]",
+          className,
+        )}
+      >
         <CardHeader className="pb-2">
           <p className="shepherd-kicker">Church Health</p>
           <CardTitle className="text-base">Overall engagement signal</CardTitle>
         </CardHeader>
         <CardContent>
           {!hasData ? (
-            <div className="flex min-h-[150px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-[#FAFBFA] p-4 text-center">
+            <div className="flex min-h-[150px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-[var(--surface-2)] p-4 text-center">
               <p className="text-sm font-semibold text-foreground">Not enough data yet</p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 Risk scoring runs on established members once they&apos;ve built up attendance history — the signal appears after a sync covers them.

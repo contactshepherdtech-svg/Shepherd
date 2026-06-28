@@ -166,7 +166,7 @@ function MembersContent() {
                         className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
                           active
                         ? "border-primary bg-primary text-primary-foreground shadow-[0_8px_18px_rgba(0,107,85,0.16)]"
-                            : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:bg-[#FAFBFA]"
+                            : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:bg-[var(--surface-2)]"
                         }`}
                       >
                         {tier}
@@ -179,7 +179,7 @@ function MembersContent() {
 
             <div className="shepherd-scrollbar space-y-2.5 pr-1 xl:max-h-[calc(100%-118px)] xl:overflow-y-auto">
               {!allMembersCount ? (
-                <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-6 text-center">
+                <div className="rounded-lg border border-dashed border-border bg-[var(--surface-2)] p-6 text-center">
                   <p className="text-sm font-medium text-foreground">No members found.</p>
                   <p className="mt-1 text-sm text-muted-foreground">Sync your directory to populate this list.</p>
                 </div>
@@ -195,7 +195,7 @@ function MembersContent() {
               )}
 
               {allMembersCount > 0 && !filteredRows.length ? (
-                <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-6 text-center">
+                <div className="rounded-lg border border-dashed border-border bg-[var(--surface-2)] p-6 text-center">
                   <p className="text-sm font-medium text-foreground">No members match your search.</p>
                   <p className="mt-1 text-sm text-muted-foreground">Try a different keyword or tier filter.</p>
                 </div>

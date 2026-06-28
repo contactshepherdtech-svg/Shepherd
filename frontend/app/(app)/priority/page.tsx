@@ -151,15 +151,15 @@ export default function PriorityPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3">
+              <div className="rounded-lg border border-border/80 bg-[var(--surface-2)] p-3">
                 <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Open</p>
                 <p className="mt-1 text-2xl font-semibold">{filteredQueue.length}</p>
               </div>
-              <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3">
+              <div className="rounded-lg border border-border/80 bg-[var(--surface-2)] p-3">
                 <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Critical</p>
                 <p className="mt-1 text-2xl font-semibold">{urgentCount}</p>
               </div>
-              <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3">
+              <div className="rounded-lg border border-border/80 bg-[var(--surface-2)] p-3">
                 <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Ready</p>
                 <p className="mt-1 text-2xl font-semibold">{filteredQueue.length - urgentCount}</p>
               </div>
@@ -170,7 +170,7 @@ export default function PriorityPage() {
                 : "Visitor follow-up still appears here even before risk scoring is available."}
             </div>
             {firstVisitCounts.dueNow || firstVisitCounts.comingUp ? (
-              <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3 text-sm text-muted-foreground">
+              <div className="rounded-lg border border-border/80 bg-[var(--surface-2)] p-3 text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">First-visit follow-ups</span> · Due now{" "}
                 <span className="font-semibold text-primary">{firstVisitCounts.dueNow}</span> · Coming up{" "}
                 <span className="font-semibold text-foreground">{firstVisitCounts.comingUp}</span>
@@ -214,14 +214,14 @@ export default function PriorityPage() {
               {filteredQueue.slice(0, 3).map((row) => (
                 <div
                   key={row.member.id}
-                  className="flex items-center justify-between rounded-lg border border-border/80 bg-[#FAFBFA] p-2"
+                  className="flex items-center justify-between rounded-lg border border-border/80 bg-[var(--surface-2)] p-2"
                 >
                   <span className="text-sm font-medium text-foreground">{row.member.name}</span>
                   {row.risk.tier ? <RiskBadge tier={row.risk.tier} /> : null}
                 </div>
               ))}
               {!filteredQueue.length ? (
-                <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-4 text-sm text-muted-foreground">
+                <div className="rounded-lg border border-dashed border-border bg-[var(--surface-2)] p-4 text-sm text-muted-foreground">
                   {queueRows.length ? "No queue items match this filter." : "No active follow-up queue items."}
                 </div>
               ) : null}

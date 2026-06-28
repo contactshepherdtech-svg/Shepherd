@@ -44,7 +44,7 @@ type ThresholdSliderProps = {
 function ThresholdSlider({ label, value, onChange, disabled, badgeColor, description }: ThresholdSliderProps) {
   const pct = Math.round((value / SLIDER_MAX) * 100);
   return (
-    <div className="space-y-3 rounded-xl border border-border/80 bg-[#FAFBFA] p-4">
+    <div className="space-y-3 rounded-xl border border-border/80 bg-[var(--surface-2)] p-4">
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
           {label}
@@ -222,7 +222,7 @@ export function ConnectionChecklistPanel({
                 className={`flex items-start gap-3 rounded-xl border p-3.5 transition-colors ${
                   item.done
                     ? "border-emerald-200 bg-emerald-50"
-                    : "border-border/70 bg-[#FAFBFA]"
+                    : "border-border/70 bg-[var(--surface-2)]"
                 }`}
               >
                 {loading ? (
@@ -401,7 +401,7 @@ export function PlanningCenterConnectionPanel({
         </>
       ) : undefined}
     >
-      <div className="rounded-xl border border-border/80 bg-[#FAFBFA] p-3.5 text-sm">
+      <div className="rounded-xl border border-border/80 bg-[var(--surface-2)] p-3.5 text-sm">
         <p className="inline-flex items-center gap-2 font-semibold text-foreground">
           {connected ? (
             <CheckCircle2 className="size-4 text-emerald-600" />
@@ -500,7 +500,7 @@ export function GmailConnectionPanel({ churchId, connection, loading = false, on
         </Button>
       ) : undefined}
     >
-      <div className="rounded-xl border border-border/80 bg-[#FAFBFA] p-3.5 text-sm">
+      <div className="rounded-xl border border-border/80 bg-[var(--surface-2)] p-3.5 text-sm">
         <p className="inline-flex items-center gap-2 font-semibold text-foreground">
           {connected ? (
             <CheckCircle2 className="size-4 text-emerald-600" />
@@ -602,16 +602,16 @@ export function SyncStatusPanel({ churchId, connection, loading = false, onSyncC
       }
     >
       <div className="space-y-2 text-sm text-foreground">
-        <div className="flex items-center justify-between rounded-xl border border-border/80 bg-[#FAFBFA] px-3.5 py-2.5">
+        <div className="flex items-center justify-between rounded-xl border border-border/80 bg-[var(--surface-2)] px-3.5 py-2.5">
           <span className="text-muted-foreground">Last Sync</span>
           <span className="font-medium">{loading ? "Loading…" : lastSyncLabel}</span>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
-          <div className="rounded-xl border border-border/80 bg-[#FAFBFA] px-3.5 py-2.5">
+          <div className="rounded-xl border border-border/80 bg-[var(--surface-2)] px-3.5 py-2.5">
             <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Members Imported</p>
             <p className="mt-1 text-lg font-semibold">{loading ? "—" : (liveConnection?.members_imported ?? 0)}</p>
           </div>
-          <div className="rounded-xl border border-border/80 bg-[#FAFBFA] px-3.5 py-2.5">
+          <div className="rounded-xl border border-border/80 bg-[var(--surface-2)] px-3.5 py-2.5">
             <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Attendance Imported</p>
             <p className="mt-1 text-lg font-semibold">{loading ? "—" : (liveConnection?.attendance_imported ?? 0)}</p>
           </div>
@@ -647,7 +647,7 @@ export function SyncStatusPanel({ churchId, connection, loading = false, onSyncC
                     : "Unknown time";
                 const isSuccess = run.status === "success";
                 return (
-                  <li key={run.id} className="rounded-xl border border-border/80 bg-[#FAFBFA] px-3 py-2">
+                  <li key={run.id} className="rounded-xl border border-border/80 bg-[var(--surface-2)] px-3 py-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="inline-flex items-center gap-1.5 text-xs font-medium">
                         {isSuccess ? (
@@ -819,11 +819,11 @@ export function ChurchSettingsPanel({
     >
       <div className="space-y-2 text-sm text-foreground">
         {!canEdit ? (
-          <div className="rounded-xl border border-border/70 bg-[#FAFBFA] px-3.5 py-2.5 text-xs text-muted-foreground">
+          <div className="rounded-xl border border-border/70 bg-[var(--surface-2)] px-3.5 py-2.5 text-xs text-muted-foreground">
             These settings are read-only for your role — only an admin can change them.
           </div>
         ) : null}
-        <div className="grid gap-2 rounded-xl border border-border/80 bg-[#FAFBFA] px-3.5 py-2.5 sm:grid-cols-[160px_1fr] sm:items-center">
+        <div className="grid gap-2 rounded-xl border border-border/80 bg-[var(--surface-2)] px-3.5 py-2.5 sm:grid-cols-[160px_1fr] sm:items-center">
           <span className="text-muted-foreground">Church Name</span>
           <Input
             value={loading ? "" : (formValues.church_name ?? "")}
@@ -832,7 +832,7 @@ export function ChurchSettingsPanel({
             disabled={loading || saving || !canEdit}
           />
         </div>
-        <div className="grid gap-2 rounded-xl border border-border/80 bg-[#FAFBFA] px-3.5 py-2.5 sm:grid-cols-[160px_1fr] sm:items-center">
+        <div className="grid gap-2 rounded-xl border border-border/80 bg-[var(--surface-2)] px-3.5 py-2.5 sm:grid-cols-[160px_1fr] sm:items-center">
           <span className="text-muted-foreground">Service Frequency</span>
           <select
             value={loading ? DEFAULT_MAIN_SERVICE_FREQUENCY : (formValues.main_service_frequency ?? DEFAULT_MAIN_SERVICE_FREQUENCY)}
@@ -879,7 +879,7 @@ export function ChurchSettingsPanel({
           </div>
         </div>
 
-        <div className="grid gap-2 rounded-xl border border-border/80 bg-[#FAFBFA] px-3.5 py-2.5 sm:grid-cols-[160px_1fr] sm:items-center">
+        <div className="grid gap-2 rounded-xl border border-border/80 bg-[var(--surface-2)] px-3.5 py-2.5 sm:grid-cols-[160px_1fr] sm:items-center">
           <span className="text-muted-foreground">Follow-up Style</span>
           <Input
             value={loading ? "" : (formValues.preferred_followup_style ?? "")}

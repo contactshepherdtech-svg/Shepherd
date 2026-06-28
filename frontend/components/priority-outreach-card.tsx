@@ -219,7 +219,7 @@ export function PriorityOutreachCard({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-xl border border-border bg-[#FAFBFA] p-3">
+          <div className="rounded-xl border border-border bg-[var(--surface-2)] p-3">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Why now</p>
             {row.risk.reasons.length ? (
               <ul className="mt-1 space-y-1 text-sm text-foreground">

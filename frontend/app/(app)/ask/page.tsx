@@ -19,7 +19,7 @@ const USER_BUBBLE_CLASS =
   "max-w-[min(100%,36rem)] break-words [overflow-wrap:anywhere] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-6 text-primary-foreground shadow-sm";
 
 const ASSISTANT_BUBBLE_CLASS =
-  "max-w-[min(100%,46rem)] break-words [overflow-wrap:anywhere] rounded-2xl rounded-bl-md border border-border bg-[#FAFBFA] px-4 py-3.5 text-sm leading-6 text-foreground shadow-sm";
+  "max-w-[min(100%,46rem)] break-words [overflow-wrap:anywhere] rounded-2xl rounded-bl-md border border-border bg-[var(--surface-2)] px-4 py-3.5 text-sm leading-6 text-foreground shadow-sm";
 
 const ASK_TIMEOUT_MS = 45_000;
 
@@ -195,7 +195,7 @@ export default function AskPage() {
 
             {sending ? (
               <div className="flex justify-start">
-                <div className="flex items-center gap-1.5 rounded-2xl border border-border bg-[#FAFBFA] px-4 py-3">
+                <div className="flex items-center gap-1.5 rounded-2xl border border-border bg-[var(--surface-2)] px-4 py-3">
                   {[0, 1, 2].map((dot) => (
                     <motion.span
                       key={dot}

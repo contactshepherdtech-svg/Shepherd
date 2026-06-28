@@ -26,7 +26,7 @@ export function MemberCard({ row, selected, onSelect }: MemberCardProps) {
         "group cursor-pointer rounded-2xl border bg-card p-3 shadow-sm transition-all",
         selected
           ? "border-primary/32 bg-primary/[0.035] shadow-[0_12px_30px_rgba(0,107,85,0.10)]"
-          : "border-border hover:border-primary/18 hover:bg-[#FAFBFA] hover:shadow-[0_10px_24px_rgba(17,24,39,0.07)]",
+          : "border-border hover:border-primary/18 hover:bg-[var(--surface-2)] hover:shadow-[0_10px_24px_rgba(17,24,39,0.07)]",
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -43,7 +43,7 @@ export function MemberCard({ row, selected, onSelect }: MemberCardProps) {
         {row.risk.tier ? (
           <RiskBadge tier={row.risk.tier} />
         ) : (
-          <span className="rounded-full border border-border/80 bg-[#FAFBFA] px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+          <span className="rounded-full border border-border/80 bg-[var(--surface-2)] px-2.5 py-1 text-xs font-semibold text-muted-foreground">
             No risk score available
           </span>
         )}

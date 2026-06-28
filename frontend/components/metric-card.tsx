@@ -13,6 +13,7 @@ type MetricCardProps = {
   supporting: string;
   icon: LucideIcon;
   tone?: "evergreen" | "gold" | "critical" | "neutral";
+  className?: string;
 };
 
 const toneStyles = {
@@ -67,6 +68,7 @@ export function MetricCard({
   supporting,
   icon: Icon,
   tone = "neutral",
+  className,
 }: MetricCardProps) {
   return (
     <motion.div
@@ -76,7 +78,12 @@ export function MetricCard({
       whileHover={{ y: -3 }}
       className="h-full"
     >
-      <Card className="h-full transition-all duration-200 hover:border-primary/12 hover:shadow-[0_18px_44px_rgba(17,24,39,0.10)]">
+      <Card
+        className={cn(
+          "h-full transition-all duration-200 hover:border-primary/12 hover:shadow-[0_18px_44px_rgba(17,24,39,0.10)]",
+          className,
+        )}
+      >
         <CardHeader className="flex-row items-center justify-between pb-3">
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
           <span className={cn("rounded-lg border p-2", toneStyles[tone])}>

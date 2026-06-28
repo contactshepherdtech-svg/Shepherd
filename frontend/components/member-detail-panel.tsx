@@ -578,7 +578,7 @@ export function MemberDetailPanel({
                   </div>
                 </div>
               ) : (
-                <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-6 text-center">
+                <div className="rounded-lg border border-dashed border-border bg-[var(--surface-2)] p-6 text-center">
                   <p className="text-sm font-semibold text-foreground">No attendance history</p>
                   <p className="mt-1 text-sm text-muted-foreground">Attendance records will appear here after sync.</p>
                 </div>
@@ -596,7 +596,7 @@ export function MemberDetailPanel({
               <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
             </summary>
             <div className="space-y-3 border-t border-border/60 px-5 py-4">
-              <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-4">
+              <div className="rounded-lg border border-border/80 bg-[var(--surface-2)] p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Reasons</p>
                 {row.risk.reasons.length ? (
                   <ul className="mt-2 space-y-1 text-sm text-foreground">
@@ -689,7 +689,7 @@ export function MemberDetailPanel({
 
                 {/* Current outreach status badge */}
                 {outreachStatus && outreachStatus.status !== "active" ? (
-                  <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3 text-sm">
+                  <div className="rounded-lg border border-border/80 bg-[var(--surface-2)] p-3 text-sm">
                     {outreachStatus.status === "contacted" ? (
                       <p className="inline-flex items-center gap-2 font-semibold text-primary">
                         <CheckCircle2 className="size-4" />
@@ -794,7 +794,7 @@ export function MemberDetailPanel({
                   </Button>
                 </div>
 
-                <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3">
+                <div className="rounded-lg border border-border/80 bg-[var(--surface-2)] p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                       <Activity className="size-4 text-primary" />
@@ -906,7 +906,7 @@ export function MemberDetailPanel({
                     onClick={() => setEditing(false)}
                   >
                     <div
-                      className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-border bg-card p-5 shadow-xl"
+                      className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl glass-overlay p-5"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center justify-between">
@@ -916,7 +916,7 @@ export function MemberDetailPanel({
                         <button
                           type="button"
                           onClick={() => setEditing(false)}
-                          className="text-muted-foreground transition-colors hover:text-foreground"
+                          className="text-foreground/70 transition-colors hover:text-foreground"
                           aria-label="Close"
                         >
                           <X className="size-4" />

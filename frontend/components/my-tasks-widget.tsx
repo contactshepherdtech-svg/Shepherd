@@ -105,7 +105,7 @@ export function MyTasksWidget() {
           top-right action pane; the expanded card grows upward from the pill. */}
       <div className="fixed bottom-4 right-4 z-30 hidden w-[320px] lg:block">
         {expanded ? (
-          <div className="rounded-2xl border border-border/70 bg-card shadow-[0_18px_44px_rgba(17,24,39,0.12)]">
+          <div className="rounded-2xl glass-panel">
             <div className="flex items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
               <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                 <ListChecks className="size-4 text-primary" />
@@ -117,7 +117,7 @@ export function MyTasksWidget() {
               <button
                 type="button"
                 onClick={() => setExpanded(false)}
-                className="text-muted-foreground transition-colors hover:text-foreground"
+                className="text-foreground/70 transition-colors hover:text-foreground"
                 aria-label="Collapse my tasks"
               >
                 <ChevronDown className="size-4" />
@@ -127,7 +127,7 @@ export function MyTasksWidget() {
               {open.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-start gap-2 rounded-lg border border-border/60 bg-[#FAFBFA] p-2.5"
+                  className="flex items-start gap-2 rounded-lg border border-border/60 bg-[var(--surface-2)] p-2.5"
                 >
                   <button
                     type="button"
@@ -163,7 +163,7 @@ export function MyTasksWidget() {
             type="button"
             aria-label="Expand my tasks"
             onClick={() => setExpanded(true)}
-            className="ml-auto flex items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-2 text-sm font-semibold text-foreground shadow-[0_10px_28px_rgba(17,24,39,0.12)] transition-colors hover:border-primary/40"
+            className="ml-auto flex items-center gap-2 rounded-full glass-panel px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:border-primary/40"
           >
             <ListChecks className="size-4 text-primary" />
             My Tasks
@@ -181,7 +181,7 @@ export function MyTasksWidget() {
           onClick={() => setNoteFor(null)}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl"
+            className="w-full max-w-md rounded-2xl glass-overlay p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -189,7 +189,7 @@ export function MyTasksWidget() {
               <button
                 type="button"
                 onClick={() => setNoteFor(null)}
-                className="text-muted-foreground transition-colors hover:text-foreground"
+                className="text-foreground/70 transition-colors hover:text-foreground"
                 aria-label="Close"
               >
                 <X className="size-4" />

@@ -93,7 +93,7 @@ export default function AssignmentsPage() {
             data.myChecklist.map((item) => (
               <div
                 key={item.id}
-                className="flex items-start gap-3 rounded-lg border border-border/70 bg-[#FAFBFA] p-3"
+                className="flex items-start gap-3 rounded-lg border border-border/70 bg-[var(--surface-2)] p-3"
               >
                 <button
                   type="button"

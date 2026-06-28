@@ -147,7 +147,7 @@ export function MemberAssign({ memberDbId, memberName, churchId }: MemberAssignP
           onClick={() => !busy && setModalOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl"
+            className="w-full max-w-md rounded-2xl glass-overlay p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -158,7 +158,7 @@ export function MemberAssign({ memberDbId, memberName, churchId }: MemberAssignP
                 type="button"
                 onClick={() => setModalOpen(false)}
                 disabled={busy}
-                className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                className="text-foreground/70 transition-colors hover:text-foreground disabled:opacity-50"
                 aria-label="Close"
               >
                 <X className="size-4" />

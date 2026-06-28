@@ -169,6 +169,7 @@ export default function DashboardPage() {
           scoredCount={scoredMemberCount}
           totalCount={totalMembers}
           needsAttention={atRiskCount}
+          className="surface-card"
         />
         <MetricCard
           label="Total Members"
@@ -176,6 +177,7 @@ export default function DashboardPage() {
           supporting="Active member records in Shepherd"
           icon={Users}
           tone="evergreen"
+          className="surface-card"
         />
         <MetricCard
           label="At Risk"
@@ -187,6 +189,7 @@ export default function DashboardPage() {
           }
           icon={AlertTriangle}
           tone="critical"
+          className="surface-card"
         />
         <MetricCard
           label="Attendance Trend"
@@ -194,18 +197,19 @@ export default function DashboardPage() {
           supporting={hasPriorWindow ? "Compared to previous 4-week window" : "Not enough history yet"}
           icon={TrendingUp}
           tone={hasPriorWindow ? (trendDelta >= 0 ? "evergreen" : "gold") : "neutral"}
+          className="surface-card"
         />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">
-        <Card className="shepherd-elevate">
+        <Card className="shepherd-elevate surface-card">
           <CardHeader>
             <p className="shepherd-kicker">Risk Distribution</p>
             <CardTitle>Member risk mix</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {!riskRows.length ? (
-              <p className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-4 text-sm text-muted-foreground">
+              <p className="rounded-lg border border-dashed border-border bg-[var(--surface-2)] p-4 text-sm text-muted-foreground">
                 No risk scores yet. Scoring covers established members only — visitors aren&apos;t scored.
               </p>
             ) : null}
@@ -234,7 +238,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="shepherd-elevate">
+        <Card className="shepherd-elevate surface-card">
           <CardHeader>
             <p className="shepherd-kicker">Weekly Attendance</p>
             <CardTitle>Last 12 weeks</CardTitle>
@@ -242,7 +246,7 @@ export default function DashboardPage() {
           <CardContent className="space-y-3">
             {hasEnoughTrend ? (
               <>
-                <div className="grid h-[168px] grid-cols-12 items-end gap-1.5 overflow-hidden rounded-xl border border-border bg-[#FAFBFA] p-3">
+                <div className="grid h-[168px] grid-cols-12 items-end gap-1.5 overflow-hidden rounded-xl border border-border bg-[var(--surface-2)] p-3">
                   {attendanceTrend.map((point) => (
                     <div key={point.label} className="flex h-full flex-col justify-end">
                       <div
@@ -264,7 +268,7 @@ export default function DashboardPage() {
                 </div>
               </>
             ) : (
-              <div className="flex h-[168px] flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border bg-[#FAFBFA] p-4 text-center text-sm text-muted-foreground">
+              <div className="flex h-[168px] flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border bg-[var(--surface-2)] p-4 text-center text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">Not enough data for a trend yet</span>
                 <span className="text-xs">
                   {weeksWithData === 0
@@ -276,21 +280,21 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="shepherd-elevate">
+        <Card className="shepherd-elevate surface-card">
           <CardHeader>
             <p className="shepherd-kicker">Engagement Overview</p>
             <CardTitle>Current participation status</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="rounded-xl border border-border bg-[#FAFBFA] p-3">
+            <div className="rounded-xl border border-border bg-[var(--surface-2)] p-3">
               <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Active (0-14d)</p>
               <p className="mt-1 text-2xl font-semibold text-foreground">{engagementOverview.active}</p>
             </div>
-            <div className="rounded-xl border border-border bg-[#FAFBFA] p-3">
+            <div className="rounded-xl border border-border bg-[var(--surface-2)] p-3">
               <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Slipping (15-35d)</p>
               <p className="mt-1 text-2xl font-semibold text-foreground">{engagementOverview.slipping}</p>
             </div>
-            <div className="rounded-xl border border-border bg-[#FAFBFA] p-3">
+            <div className="rounded-xl border border-border bg-[var(--surface-2)] p-3">
               <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Disengaged (35d+)</p>
               <p className="mt-1 text-2xl font-semibold text-foreground">{engagementOverview.disengaged}</p>
             </div>
@@ -299,7 +303,7 @@ export default function DashboardPage() {
       </section>
 
       <section>
-        <Card className="shepherd-elevate">
+        <Card className="shepherd-elevate surface-card">
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -314,11 +318,11 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {!memberRows.length ? (
-              <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-6 text-center text-sm text-muted-foreground">
+              <div className="rounded-lg border border-dashed border-border bg-[var(--surface-2)] p-6 text-center text-sm text-muted-foreground">
                 No members found.
               </div>
             ) : !priorityRows.length ? (
-              <div className="rounded-lg border border-dashed border-border bg-[#FAFBFA] p-6 text-center text-sm text-muted-foreground">
+              <div className="rounded-lg border border-dashed border-border bg-[var(--surface-2)] p-6 text-center text-sm text-muted-foreground">
                 No active follow-up queue items.
               </div>
             ) : (
