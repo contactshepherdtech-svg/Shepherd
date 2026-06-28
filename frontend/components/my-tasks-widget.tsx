@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { ChevronUp, Circle, ListChecks, Pencil, X } from "lucide-react";
+import { ChevronDown, Circle, ListChecks, Pencil, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
@@ -32,7 +32,6 @@ export function MyTasksWidget() {
   const [noteDraft, setNoteDraft] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
     if (!canHaveTasks) {
@@ -53,11 +52,6 @@ export function MyTasksWidget() {
   useEffect(() => {
     void load();
   }, [load, pathname]);
-
-  // Clear any pending hover-to-expand timer on unmount.
-  useEffect(() => () => {
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-  }, []);
 
   const onTick = async (item: AssignmentItem) => {
     setBusyId(item.id);
@@ -99,20 +93,6 @@ export function MyTasksWidget() {
     setNoteFor(null);
   };
 
-  // Collapsed pill: hovering opens after a short delay so an accidental pass-over
-  // doesn't twitch it open. Leaving before the delay cancels. It never auto-collapses —
-  // collapsing is always a deliberate click on the caret.
-  const onPillEnter = () => {
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    hoverTimer.current = setTimeout(() => setExpanded(true), 150);
-  };
-  const onPillLeave = () => {
-    if (hoverTimer.current) {
-      clearTimeout(hoverTimer.current);
-      hoverTimer.current = null;
-    }
-  };
-
   // Gate stack (after hooks): role → settings route → zero open tasks all render nothing.
   if (!canHaveTasks) return null;
   if (pathname.startsWith("/settings")) return null;
@@ -120,8 +100,10 @@ export function MyTasksWidget() {
 
   return (
     <>
-      {/* Desktop-only (matches the sidebar's lg breakpoint); mobile uses /assignments. */}
-      <div className="fixed right-4 top-[100px] z-30 hidden w-[320px] lg:block">
+      {/* Desktop-only (matches the sidebar's lg breakpoint); mobile uses /assignments.
+          Anchored bottom-right so it never collides with the member page's sticky
+          top-right action pane; the expanded card grows upward from the pill. */}
+      <div className="fixed bottom-4 right-4 z-30 hidden w-[320px] lg:block">
         {expanded ? (
           <div className="rounded-2xl border border-border/70 bg-card shadow-[0_18px_44px_rgba(17,24,39,0.12)]">
             <div className="flex items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
@@ -138,7 +120,7 @@ export function MyTasksWidget() {
                 className="text-muted-foreground transition-colors hover:text-foreground"
                 aria-label="Collapse my tasks"
               >
-                <ChevronUp className="size-4" />
+                <ChevronDown className="size-4" />
               </button>
             </div>
             <div className="shepherd-scrollbar max-h-[60vh] space-y-1.5 overflow-y-auto p-2">
@@ -181,8 +163,6 @@ export function MyTasksWidget() {
             type="button"
             aria-label="Expand my tasks"
             onClick={() => setExpanded(true)}
-            onMouseEnter={onPillEnter}
-            onMouseLeave={onPillLeave}
             className="ml-auto flex items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-2 text-sm font-semibold text-foreground shadow-[0_10px_28px_rgba(17,24,39,0.12)] transition-colors hover:border-primary/40"
           >
             <ListChecks className="size-4 text-primary" />

@@ -16,7 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { AssignmentCard } from "@/components/assignment-card";
+import { MemberAssign } from "@/components/member-assign";
 import { OutreachStatusBadge } from "@/components/outreach-status-badge";
 import { RiskBadge } from "@/components/risk-badge";
 import { Button } from "@/components/ui/button";
@@ -414,6 +414,11 @@ export function MemberDetailPanel({
               <Mail className="size-4" />
               {row.member.email || "No email on file"}
             </p>
+            <MemberAssign
+              memberDbId={row.member.db_id}
+              memberName={row.member.name}
+              churchId={churchId}
+            />
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-border/80 bg-[#F3F5F4] px-2.5 py-1 text-xs font-medium text-foreground">
                 {row.member.status}
@@ -568,7 +573,7 @@ export function MemberDetailPanel({
         </div>
 
         {/* RIGHT — actions (sticky on desktop; first on mobile). */}
-        <aside className="order-1 space-y-4 xl:order-2 xl:sticky xl:top-[96px] xl:self-start">
+        <aside className="order-1 space-y-3 xl:order-2 xl:sticky xl:top-[96px] xl:self-start">
           {/* The one useful line from the old Recommended Action, next to the controls. */}
           <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm">
             <span className="inline-flex items-center gap-1.5 font-semibold text-primary">
@@ -584,7 +589,7 @@ export function MemberDetailPanel({
                 <p className="shepherd-kicker">Outreach Actions</p>
                 <CardTitle>Generate communication drafts</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3">
                 {isVisitor && churchId && row.member.pco_id ? (
                   <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -730,7 +735,7 @@ export function MemberDetailPanel({
                   </Button>
                 </div>
 
-                <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-4">
+                <div className="rounded-lg border border-border/80 bg-[#FAFBFA] p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                       <Activity className="size-4 text-primary" />
@@ -764,7 +769,7 @@ export function MemberDetailPanel({
                       {draft.type === "email" && draft.subject ? (
                         <p className="text-sm font-semibold text-foreground">Subject: {draft.subject}</p>
                       ) : null}
-                      <pre className="shepherd-scrollbar max-h-64 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 text-muted-foreground">
+                      <pre className="shepherd-scrollbar max-h-44 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 text-muted-foreground">
                         {draft.body}
                       </pre>
                       <p className="text-xs text-muted-foreground/70">
@@ -825,12 +830,6 @@ export function MemberDetailPanel({
               </CardContent>
             </Card>
           ) : null}
-
-          <AssignmentCard
-            memberDbId={row.member.db_id}
-            memberName={row.member.name}
-            churchId={churchId}
-          />
         </aside>
       </div>
     </motion.div>
