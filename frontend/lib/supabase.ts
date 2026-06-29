@@ -3,6 +3,12 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 export type Database = {
   public: {
     Tables: {
+      access_requests: {
+        Row: { id: string; church_name: string; email: string; created_at: string };
+        Insert: { id?: string; church_name: string; email: string; created_at?: string };
+        Update: { id?: string; church_name?: string; email?: string; created_at?: string };
+        Relationships: [];
+      };
       churches: {
         Row: {
           id: number;

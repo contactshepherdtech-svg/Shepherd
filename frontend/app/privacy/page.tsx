@@ -1,162 +1,217 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Bullets, KeyPoints, LegalPage, Section, SUPPORT_EMAIL } from "@/components/marketing/legal-page";
 
 export const metadata: Metadata = {
   title: "Privacy Policy | Shepherd",
-  description: "Privacy Policy for Shepherd church engagement software.",
+  description:
+    "How Shepherd handles your church's data — what it accesses from Planning Center and Gmail, what it stores, and the control you have.",
 };
 
-const sections = [
-  {
-    title: "Overview",
-    body: [
-      "Shepherd is church engagement software that helps churches understand engagement patterns, coordinate visitor follow-up, prepare outreach, and support pastoral care workflows.",
-      "This Privacy Policy explains how Shepherd collects, uses, stores, and protects information when a church or authorized user connects Shepherd to church systems such as Planning Center and Gmail.",
-    ],
-  },
-  {
-    title: "Information Shepherd Stores",
-    body: [
-      "Shepherd may store church member information, attendance history, visitor lifecycle information, follow-up activity, outreach status, analytics derived from engagement activity, and outreach drafts created through the application.",
-      "Member information may include names, email addresses, Planning Center identifiers, attendance records, visitor status, lifecycle status, risk or engagement indicators, and timestamps related to follow-up workflows.",
-    ],
-  },
-  {
-    title: "Planning Center Data",
-    body: [
-      "Shepherd integrates with Planning Center only when a church explicitly authorizes the connection. Shepherd only accesses Planning Center data that the church authorizes and that is needed to provide church engagement, follow-up, analytics, and communication workflows.",
-      "Churches are responsible for ensuring that their use of Planning Center and Shepherd is consistent with their internal policies and any permissions they have obtained from members, visitors, staff, and volunteers.",
-    ],
-  },
-  {
-    title: "Gmail Data",
-    body: [
-      "Shepherd integrates with Gmail only when an authorized church user explicitly connects a Gmail account through Google's OAuth consent flow.",
-      "Gmail access is used only to create and manage outreach drafts related to Shepherd functionality. Shepherd does not read personal inbox content unrelated to Shepherd functionality, does not monitor personal email activity, and does not use Gmail data for advertising.",
-      "Shepherd's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements.",
-    ],
-  },
-  {
-    title: "How Information Is Used",
-    body: [
-      "Shepherd uses data solely to provide church engagement, visitor follow-up, outreach, analytics, and communication workflows requested by the church or authorized users.",
-      "Shepherd may use stored information to display member profiles, identify visitor follow-up needs, generate engagement summaries, prepare outreach drafts, support Gmail draft creation, and help churches organize care activity.",
-    ],
-  },
-  {
-    title: "Data Sharing and Sale",
-    body: [
-      "Shepherd does not sell user data, church data, member data, visitor data, Planning Center data, or Gmail data.",
-      "Shepherd does not share customer data with third parties for advertising, surveillance, or unrelated marketing purposes. Data may be processed by infrastructure and service providers only as needed to operate, secure, and support the Shepherd application.",
-    ],
-  },
-  {
-    title: "Data Retention and Removal",
-    body: [
-      "Shepherd retains information for as long as needed to provide the application to the church, comply with legal obligations, resolve disputes, maintain security, and support ordinary business operations.",
-      "Users or churches may request data removal by contacting support at shreeshkumar.lillyprabhu@gmail.com. Shepherd will review and process deletion requests subject to account ownership, technical feasibility, legal requirements, and legitimate operational needs.",
-    ],
-  },
-  {
-    title: "Security",
-    body: [
-      "Shepherd uses reasonable administrative, technical, and organizational safeguards designed to protect information against unauthorized access, loss, misuse, or alteration.",
-      "No online service can guarantee absolute security. Churches and users should protect their login credentials, manage authorized integrations carefully, and promptly disconnect integrations that should no longer be active.",
-    ],
-  },
-  {
-    title: "Changes to This Policy",
-    body: [
-      "Shepherd may update this Privacy Policy as the application, integrations, or legal requirements change. Updated versions will be posted on this page with a revised Last Updated date.",
-    ],
-  },
-  {
-    title: "Contact",
-    body: [
-      "Questions, requests, or concerns about this Privacy Policy may be sent to shreeshkumar.lillyprabhu@gmail.com.",
-    ],
-  },
-];
+const GOOGLE_POLICY_URL = "https://developers.google.com/terms/api-services-user-data-policy";
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-background px-5 py-10 text-foreground md:px-8 md:py-14">
-      <div className="mx-auto max-w-[800px] space-y-6">
-        <header className="space-y-4">
-          <Link href="https://www.shepherdtech.app" className="shepherd-kicker inline-block hover:text-primary">
-            Shepherd
-          </Link>
-          <div className="space-y-3">
-            <p className="shepherd-kicker">Last Updated: June 2026</p>
-            <h1 className="font-heading text-4xl font-semibold tracking-[-0.02em] text-foreground md:text-5xl">
-              Privacy Policy
-            </h1>
-            <p className="max-w-2xl text-base leading-7 text-muted-foreground">
-              This policy describes how Shepherd handles church engagement data, Planning Center data,
-              Gmail data, visitor follow-up activity, analytics, and outreach workflows.
-            </p>
-          </div>
-          <nav className="flex flex-wrap gap-2 text-sm font-medium">
-            <Link
-              href="/terms"
-              className="rounded-full border border-border bg-card px-3 py-1.5 text-foreground transition-colors hover:border-primary/30 hover:text-primary"
-            >
-              Terms of Service
-            </Link>
-            <Link
-              href="https://www.shepherdtech.app"
-              className="rounded-full border border-border bg-card px-3 py-1.5 text-foreground transition-colors hover:border-primary/30 hover:text-primary"
-            >
-              Back to Shepherd
-            </Link>
-          </nav>
-        </header>
+    <LegalPage
+      title="Privacy Policy"
+      intro="Shepherd is church engagement software. It connects to the tools your church already uses — Planning Center, and optionally Gmail — to help your team notice members who are drifting and follow up in time. This policy explains, in plain language, exactly what data Shepherd accesses, what it stores, and the control you have over it."
+    >
+      <KeyPoints
+        items={[
+          "Shepherd never reads, searches, or sends your email. With Gmail, it only creates draft messages that your team reviews and sends.",
+          "From Planning Center, Shepherd reads only your member directory and check-in (attendance) records — nothing else.",
+          "Your church's data is isolated from every other church, and is never sold or used for advertising.",
+          "An admin connects Planning Center and Gmail, and you can disconnect either at any time.",
+          "You can ask us to delete your church's data by email.",
+        ]}
+      />
 
-        <Card>
-          <CardHeader className="border-b border-border">
-            <CardTitle className="text-xl">Shepherd Privacy Policy</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-8 pt-6">
-            {sections.map((section) => (
-              <section key={section.title} className="space-y-3">
-                <h2 className="font-heading text-xl font-semibold tracking-[-0.01em] text-foreground">
-                  {section.title}
-                </h2>
-                <div className="space-y-3 text-sm leading-7 text-muted-foreground md:text-base">
-                  {section.body.map((paragraph) => (
-                    <p key={paragraph}>{paragraph}</p>
-                  ))}
-                  {section.title === "Gmail Data" ? (
-                    <p>
-                      Google API Services User Data Policy:{" "}
-                      <a
-                        href="https://developers.google.com/terms/api-services-user-data-policy"
-                        className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
-                      >
-                        https://developers.google.com/terms/api-services-user-data-policy
-                      </a>
-                    </p>
-                  ) : null}
-                </div>
-              </section>
-            ))}
-          </CardContent>
-        </Card>
+      <Section title="Who this policy covers">
+        <p>
+          Shepherd is used by churches. Your church — and the staff it authorizes — is the customer. Information
+          about your members and visitors is provided by your church through its connected Planning Center account.
+          Your church is responsible for having an appropriate basis to use that information with Shepherd and for
+          its own commitments to its members.
+        </p>
+      </Section>
 
-        <footer className="flex flex-col gap-2 border-t border-border pt-5 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <span>Shepherd church engagement software</span>
-          <div className="flex flex-wrap gap-3">
-            <Link href="/terms" className="font-medium text-foreground hover:text-primary">
-              Terms of Service
-            </Link>
-            <Link href="https://www.shepherdtech.app" className="font-medium text-foreground hover:text-primary">
-              shepherdtech.app
-            </Link>
-          </div>
-        </footer>
-      </div>
-    </main>
+      <Section title="Information Shepherd stores">
+        <p>When your church uses Shepherd, the following is stored in our database:</p>
+        <Bullets
+          items={[
+            <><strong className="font-semibold text-foreground">Member information</strong> synced from Planning Center: names, email addresses, member status, Planning Center identifiers, and check-in (attendance) records.</>,
+            <><strong className="font-semibold text-foreground">Engagement information Shepherd derives</strong>: visitor lifecycle (first-time, returning, established), an engagement/risk score and the reasons behind it, and follow-up status.</>,
+            <><strong className="font-semibold text-foreground">Outreach you create</strong>: AI-generated or written email/SMS drafts and a log of outreach activity.</>,
+            <><strong className="font-semibold text-foreground">Team & workspace</strong>: your church's name, staff accounts and their roles (admin, pastor, viewer), follow-up assignments, and pastoral notes.</>,
+            <><strong className="font-semibold text-foreground">Connections</strong>: the access credentials (tokens) for the Planning Center and Gmail accounts you connect, and the email address of the connected Gmail account.</>,
+            <><strong className="font-semibold text-foreground">Access requests</strong>: if you submit the &ldquo;Request access&rdquo; form on our site, the church name and email you enter.</>,
+          ]}
+        />
+      </Section>
+
+      <Section title="Planning Center data">
+        <p>
+          Shepherd connects to Planning Center only after an administrator authorizes it through Planning Center&apos;s
+          secure sign-in (OAuth). The permission Shepherd requests is limited to{" "}
+          <strong className="font-semibold text-foreground">People and Check-ins</strong> (the{" "}
+          <code className="rounded bg-[#f1f3f2] px-1.5 py-0.5 text-[0.85em]">people check_ins</code> scope).
+        </p>
+        <p>From that, Shepherd reads members&apos; names, email addresses, member status, and check-in / attendance records — and nothing else.</p>
+        <Bullets
+          items={[
+            "Shepherd's access is read-only. It cannot change or delete anything in your Planning Center account.",
+            "Syncing happens on demand, when your team runs it — Shepherd does not pull data continuously in the background.",
+            "Shepherd does not request or read other Planning Center data such as giving.",
+          ]}
+        />
+      </Section>
+
+      <Section title="Google account & Gmail data">
+        <p>
+          Connecting Gmail is optional and must be authorized by an administrator. When connected, Shepherd requests
+          two Google permissions:
+        </p>
+        <Bullets
+          items={[
+            <><code className="rounded bg-[#f1f3f2] px-1.5 py-0.5 text-[0.85em]">gmail.compose</code> — to create email drafts in the connected Gmail account.</>,
+            <><code className="rounded bg-[#f1f3f2] px-1.5 py-0.5 text-[0.85em]">userinfo.email</code> — to know which Gmail address is connected.</>,
+          ]}
+        />
+        <p>
+          <strong className="font-semibold text-foreground">
+            Shepherd only creates drafts. It never reads, searches, lists, or downloads your email, and it never
+            sends email on its own.
+          </strong>{" "}
+          Every draft Shepherd creates lands in your Gmail Drafts folder for a person on your team to review and
+          send. We store the connected email address and the access credentials needed to create drafts.
+        </p>
+        <p>
+          Shepherd&apos;s use and transfer of information received from Google APIs adheres to the{" "}
+          <a
+            href={GOOGLE_POLICY_URL}
+            className="font-medium text-primary underline underline-offset-4"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Google API Services User Data Policy
+          </a>
+          , including the Limited Use requirements.
+        </p>
+      </Section>
+
+      <Section title="How Shepherd uses this information">
+        <p>Shepherd uses the information above only to provide the service — to:</p>
+        <Bullets
+          items={[
+            "Score engagement and flag members who appear to be disengaging.",
+            "Build a prioritized outreach queue for your team.",
+            "Prepare outreach drafts for your team to review and send.",
+            "Coordinate staff follow-up (assignments, notes, status).",
+            "Show dashboards summarizing church health and attendance.",
+          ]}
+        />
+        <p>
+          Shepherd does <strong className="font-semibold text-foreground">not</strong> sell your data, use it for
+          advertising, or share it with other churches.
+        </p>
+      </Section>
+
+      <Section title="AI-assisted drafts and the in-app assistant">
+        <p>
+          Shepherd uses a third-party AI provider, <strong className="font-semibold text-foreground">OpenRouter</strong>,
+          to generate outreach drafts and to answer questions in the in-app assistant.
+        </p>
+        <Bullets
+          items={[
+            "To generate an outreach draft, Shepherd sends the member's first name, how long it's been since they last attended, and their recent attendance count.",
+            "For the in-app assistant, Shepherd sends a snapshot of your members (such as names, status, attendance dates, and engagement/risk information) so it can answer your question.",
+          ]}
+        />
+        <p>
+          This information is processed by OpenRouter to produce the response and is subject to OpenRouter&apos;s own
+          privacy terms, which we encourage you to review. Shepherd does not use your church&apos;s data to train its
+          own models. If no AI provider is configured, Shepherd falls back to simple, non-AI templates.
+        </p>
+      </Section>
+
+      <Section title="Who else processes your data">
+        <p>Shepherd relies on a small number of trusted providers to operate:</p>
+        <Bullets
+          items={[
+            <><strong className="font-semibold text-foreground">Supabase</strong> — our database and hosting provider, where the information above is stored.</>,
+            <><strong className="font-semibold text-foreground">Google</strong> — to create Gmail drafts, only if you connect Gmail.</>,
+            <><strong className="font-semibold text-foreground">Planning Center</strong> — the source your member and attendance data is synced from.</>,
+            <><strong className="font-semibold text-foreground">OpenRouter</strong> — for AI-generated drafts and assistant answers, as described above.</>,
+          ]}
+        />
+      </Section>
+
+      <Section title="How your data is kept separate and secure">
+        <p>
+          Each church&apos;s data is isolated. Shepherd enforces database row-level security so that staff can only
+          ever access their own church&apos;s records — one church can never read another&apos;s. Access within your
+          church is role-based (admin, pastor, viewer), and pastoral notes are visible only to admins and pastors.
+        </p>
+        <p>
+          Connection tokens are access-controlled and are never exposed to your browser or to other churches. Data is
+          encrypted in transit (HTTPS), and our database provider encrypts data at rest. No system is perfectly
+          secure, but we work to protect your information and limit access to it.
+        </p>
+      </Section>
+
+      <Section title="Keeping and deleting data">
+        <p>
+          Shepherd keeps your synced and derived data for as long as your church uses Shepherd.{" "}
+          <strong className="font-semibold text-foreground">
+            Disconnecting Planning Center or Gmail stops future syncing and draft creation, but it does not, on its
+            own, delete data Shepherd has already stored.
+          </strong>
+        </p>
+        <p>
+          To delete your church&apos;s data, email us at{" "}
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="font-medium text-primary underline underline-offset-4">
+            {SUPPORT_EMAIL}
+          </a>{" "}
+          and we will process the request. Removing a staff member from a workspace ends their access but does not
+          delete church or member data.
+        </p>
+      </Section>
+
+      <Section title="Your choices and control">
+        <Bullets
+          items={[
+            "An administrator can connect or disconnect Planning Center and Gmail at any time.",
+            "You can request deletion of your church's data by email.",
+            "Admins manage staff accounts and roles.",
+            "Because member information comes from your church, requests from individual members about their information should be directed to their church first.",
+          ]}
+        />
+      </Section>
+
+      <Section title="Children's privacy">
+        <p>
+          Shepherd is a tool for church staff and is not directed to children. Member records — which may include
+          minors who attend the church — are provided and controlled by the church. The church is responsible for
+          handling that information appropriately and for obtaining any permissions it needs.
+        </p>
+      </Section>
+
+      <Section title="Changes to this policy">
+        <p>
+          We may update this policy as Shepherd evolves. When we do, we&apos;ll update the &ldquo;Last updated&rdquo;
+          date above, and we&apos;ll communicate material changes to connected churches.
+        </p>
+      </Section>
+
+      <Section title="Contact us">
+        <p>
+          Questions about this policy or your data? Email{" "}
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="font-medium text-primary underline underline-offset-4">
+            {SUPPORT_EMAIL}
+          </a>
+          .
+        </p>
+      </Section>
+    </LegalPage>
   );
 }

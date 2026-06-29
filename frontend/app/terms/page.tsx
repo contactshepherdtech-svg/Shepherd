@@ -1,152 +1,142 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Bullets, LegalPage, Section, SUPPORT_EMAIL } from "@/components/marketing/legal-page";
 
 export const metadata: Metadata = {
   title: "Terms of Service | Shepherd",
-  description: "Terms of Service for Shepherd church engagement software.",
+  description: "The terms that govern your church's use of Shepherd.",
 };
-
-const sections = [
-  {
-    title: "Agreement to These Terms",
-    body: [
-      "These Terms of Service govern access to and use of Shepherd, a church engagement software platform for member engagement, visitor follow-up, analytics, outreach drafts, and related communication workflows.",
-      "By accessing or using Shepherd, you agree to these Terms on behalf of yourself and, if applicable, the church, ministry, organization, or entity you represent.",
-    ],
-  },
-  {
-    title: "Service Provided As-Is",
-    body: [
-      "Shepherd is provided as-is and as available. Shepherd is an MVP software platform and may contain errors, interruptions, incomplete features, or limitations.",
-      "Shepherd does not warrant that the service will be uninterrupted, error-free, secure, or that every engagement signal, imported record, generated draft, or workflow recommendation will be accurate or complete.",
-    ],
-  },
-  {
-    title: "Church Responsibilities",
-    body: [
-      "Churches are responsible for obtaining all necessary consent, authorization, and permission to collect, import, store, analyze, and use member, visitor, staff, volunteer, attendance, and communication information in Shepherd.",
-      "Churches are responsible for determining whether and how they may communicate with members and visitors through email or other outreach channels. Churches must comply with applicable privacy, data protection, electronic communication, anti-spam, and consent laws.",
-    ],
-  },
-  {
-    title: "Planning Center Data",
-    body: [
-      "Shepherd may import or reference Planning Center data when an authorized user connects a church's Planning Center account. Users are responsible for the accuracy, completeness, permission status, and lawful use of imported Planning Center data.",
-      "Shepherd is not responsible for errors, outdated records, duplicate profiles, missing attendance history, incorrect lifecycle classifications, or other issues caused by inaccurate or incomplete data in Planning Center or other connected systems.",
-    ],
-  },
-  {
-    title: "Gmail and Outreach Drafts",
-    body: [
-      "Shepherd may connect to Gmail when an authorized user grants permission through Google's OAuth consent flow. Gmail access is used for Shepherd outreach workflows, including creating and managing outreach drafts.",
-      "Shepherd may generate draft outreach messages, summaries, and suggested language. These drafts are provided for review and editing only. Shepherd does not guarantee that generated messages are accurate, appropriate, complete, pastoral, legally compliant, or suitable for any specific recipient.",
-      "Users are solely responsible for reviewing, editing, approving, and deciding whether to send any outreach message. Shepherd is not responsible for communication errors, omissions, tone, deliverability, recipient reactions, or consequences of messages sent by users.",
-    ],
-  },
-  {
-    title: "Acceptable Use",
-    body: [
-      "You agree to use Shepherd only for lawful church engagement, follow-up, analytics, and communication purposes. You may not use Shepherd to harass, mislead, discriminate, surveil, spam, or otherwise misuse personal information.",
-      "You may not attempt to bypass security controls, access data from another church or account, interfere with the service, reverse engineer the application, or use Shepherd in a way that violates applicable laws, third-party terms, or these Terms.",
-    ],
-  },
-  {
-    title: "Feature Changes",
-    body: [
-      "Shepherd may modify, add, limit, suspend, or discontinue features, integrations, workflows, models, analytics, or other parts of the service over time.",
-      "Shepherd may update these Terms as the service evolves. Continued use of Shepherd after updated Terms are posted means you accept the revised Terms.",
-    ],
-  },
-  {
-    title: "Limitation of Liability",
-    body: [
-      "To the maximum extent permitted by law, Shepherd and its operators will not be liable for indirect, incidental, special, consequential, exemplary, or punitive damages, or for lost profits, lost data, lost goodwill, service interruption, communication errors, or reliance on generated content.",
-      "Shepherd's total liability for any claim related to the service will be limited to the amount paid to Shepherd for the service during the three months before the event giving rise to the claim, or one hundred U.S. dollars if no amounts were paid.",
-    ],
-  },
-  {
-    title: "No Professional Advice",
-    body: [
-      "Shepherd provides software tools and workflow support. Shepherd does not provide legal, pastoral, counseling, financial, compliance, or professional advice.",
-      "Churches and users should consult qualified professionals when making decisions involving legal compliance, pastoral care, crisis response, data protection, or sensitive communications.",
-    ],
-  },
-  {
-    title: "Contact",
-    body: [
-      "Questions about these Terms of Service may be sent to shreeshkumar.lillyprabhu@gmail.com.",
-    ],
-  },
-];
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-background px-5 py-10 text-foreground md:px-8 md:py-14">
-      <div className="mx-auto max-w-[800px] space-y-6">
-        <header className="space-y-4">
-          <Link href="https://www.shepherdtech.app" className="shepherd-kicker inline-block hover:text-primary">
-            Shepherd
-          </Link>
-          <div className="space-y-3">
-            <p className="shepherd-kicker">Last Updated: June 2026</p>
-            <h1 className="font-heading text-4xl font-semibold tracking-[-0.02em] text-foreground md:text-5xl">
-              Terms of Service
-            </h1>
-            <p className="max-w-2xl text-base leading-7 text-muted-foreground">
-              These terms describe the responsibilities, limitations, and conditions that apply when
-              churches and authorized users access Shepherd.
-            </p>
-          </div>
-          <nav className="flex flex-wrap gap-2 text-sm font-medium">
-            <Link
-              href="/privacy"
-              className="rounded-full border border-border bg-card px-3 py-1.5 text-foreground transition-colors hover:border-primary/30 hover:text-primary"
-            >
-              Privacy Policy
-            </Link>
-            <Link
-              href="https://www.shepherdtech.app"
-              className="rounded-full border border-border bg-card px-3 py-1.5 text-foreground transition-colors hover:border-primary/30 hover:text-primary"
-            >
-              Back to Shepherd
-            </Link>
-          </nav>
-        </header>
+    <LegalPage
+      title="Terms of Service"
+      intro="These Terms govern your church's use of Shepherd. By connecting an account or using the app, you agree to them on behalf of your church. Please read them alongside our Privacy Policy, which explains how we handle your data."
+    >
+      <Section title="Agreement to these terms">
+        <p>
+          By accessing or using Shepherd, you confirm that you are authorized to act for your church and that your
+          church agrees to these Terms. If you don&apos;t agree, please don&apos;t use Shepherd.
+        </p>
+      </Section>
 
-        <Card>
-          <CardHeader className="border-b border-border">
-            <CardTitle className="text-xl">Shepherd Terms of Service</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-8 pt-6">
-            {sections.map((section) => (
-              <section key={section.title} className="space-y-3">
-                <h2 className="font-heading text-xl font-semibold tracking-[-0.01em] text-foreground">
-                  {section.title}
-                </h2>
-                <div className="space-y-3 text-sm leading-7 text-muted-foreground md:text-base">
-                  {section.body.map((paragraph) => (
-                    <p key={paragraph}>{paragraph}</p>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </CardContent>
-        </Card>
+      <Section title="What Shepherd is">
+        <p>
+          Shepherd is church engagement software. It syncs member and attendance data from Planning Center, scores
+          engagement to surface members who may be disengaging, and helps your team prepare and coordinate outreach.
+          Shepherd prepares drafts and recommendations; a person on your team always reviews and sends the actual
+          messages.
+        </p>
+      </Section>
 
-        <footer className="flex flex-col gap-2 border-t border-border pt-5 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <span>Shepherd church engagement software</span>
-          <div className="flex flex-wrap gap-3">
-            <Link href="/privacy" className="font-medium text-foreground hover:text-primary">
-              Privacy Policy
-            </Link>
-            <Link href="https://www.shepherdtech.app" className="font-medium text-foreground hover:text-primary">
-              shepherdtech.app
-            </Link>
-          </div>
-        </footer>
-      </div>
-    </main>
+      <Section title="Accounts and roles">
+        <Bullets
+          items={[
+            "Your church authorizes Shepherd and connects its own Planning Center (and optionally Gmail) account.",
+            "Staff accounts have roles — admin, pastor, or viewer — that determine what each person can see and do. Each user belongs to one church.",
+            "Administrators manage connections, staff, and roles.",
+            "You are responsible for keeping account credentials secure and for activity that happens under your church's accounts.",
+          ]}
+        />
+      </Section>
+
+      <Section title="Your church's data and responsibilities">
+        <p>
+          Your church&apos;s data remains your church&apos;s. You authorize Shepherd to access and process your
+          Planning Center and Gmail data as described in the{" "}
+          <a href="/privacy" className="font-medium text-primary underline underline-offset-4">Privacy Policy</a>{" "}
+          in order to provide the service. Your church is responsible for:
+        </p>
+        <Bullets
+          items={[
+            "Having an appropriate basis and any necessary permissions to use your members' information in Shepherd.",
+            "The accuracy of the information in your connected systems.",
+            "Your own commitments and obligations to your members and visitors.",
+          ]}
+        />
+      </Section>
+
+      <Section title="Outreach and communications">
+        <p>
+          Shepherd creates drafts; it never sends messages on its own. A person on your team reviews and sends every
+          message. Your church is responsible for the content it sends and for complying with applicable
+          communications laws and rules — including anti-spam and text-messaging regulations — and with your
+          recipients&apos; preferences.
+        </p>
+      </Section>
+
+      <Section title="Third-party services">
+        <p>
+          Shepherd works with Planning Center, Google / Gmail, OpenRouter, and Supabase to operate. Your use of those
+          connections is also subject to those providers&apos; own terms, and you agree to comply with Planning
+          Center&apos;s and Google&apos;s terms when you connect them. Shepherd is not responsible for third-party
+          services, and their features, availability, and terms may change.
+        </p>
+      </Section>
+
+      <Section title="Acceptable use">
+        <p>You agree not to:</p>
+        <Bullets
+          items={[
+            "Use Shepherd unlawfully, or to harass, harm, or mislead anyone.",
+            "Attempt to access another church's data or any data you're not authorized to see.",
+            "Reverse-engineer, disrupt, overload, or attempt to break the security of the service.",
+            "Use Shepherd in violation of Planning Center's or Google's terms.",
+          ]}
+        />
+      </Section>
+
+      <Section title="Early access, availability & no warranty">
+        <p>
+          Shepherd is offered on an early-access basis and is provided{" "}
+          <strong className="font-semibold text-foreground">&ldquo;as is&rdquo; and &ldquo;as available,&rdquo;</strong>{" "}
+          without warranties of any kind, to the maximum extent permitted by law. We don&apos;t guarantee that the
+          service will be uninterrupted or error-free. Engagement scores and generated drafts are aids for your
+          team&apos;s judgment — they are not guaranteed to be accurate and are not a substitute for pastoral
+          discernment.
+        </p>
+      </Section>
+
+      <Section title="Limitation of liability">
+        <p>
+          To the maximum extent permitted by law, Shepherd and its operators will not be liable for any indirect,
+          incidental, special, consequential, or punitive damages, or for any loss of data, arising from your use of
+          the service. This section does not limit liability that cannot be limited under applicable law.
+        </p>
+      </Section>
+
+      <Section title="Termination">
+        <p>
+          Your church may stop using Shepherd at any time and disconnect its integrations. We may suspend or end
+          access for misuse or to protect the service or others. On termination, data deletion is handled as
+          described in the Privacy Policy — contact us to remove your church&apos;s data.
+        </p>
+      </Section>
+
+      <Section title="Changes to these terms">
+        <p>
+          We may update these Terms as Shepherd evolves. When we do, we&apos;ll update the &ldquo;Last updated&rdquo;
+          date above. Continued use of Shepherd after a change means you accept the updated Terms.
+        </p>
+      </Section>
+
+      <Section title="Governing law">
+        <p>
+          These Terms are governed by the laws of{" "}
+          <span className="rounded bg-[#fff5cc] px-1 text-foreground">[governing jurisdiction — to be finalized]</span>,
+          without regard to conflict-of-laws rules.
+        </p>
+      </Section>
+
+      <Section title="Contact us">
+        <p>
+          Questions about these Terms? Email{" "}
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="font-medium text-primary underline underline-offset-4">
+            {SUPPORT_EMAIL}
+          </a>
+          .
+        </p>
+      </Section>
+    </LegalPage>
   );
 }
