@@ -24,7 +24,8 @@ CREATE INDEX IF NOT EXISTS outreach_status_status_idx
 -- Allow anon key reads and writes (adjust to your RLS policy preference)
 ALTER TABLE public.outreach_status ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "allow_all_outreach_status"
+DROP POLICY IF EXISTS "allow_all_outreach_status" ON public.outreach_status;
+CREATE POLICY "allow_all_outreach_status"
   ON public.outreach_status
   FOR ALL
   USING (true)

@@ -19,15 +19,18 @@ CREATE INDEX IF NOT EXISTS church_users_church_id_idx
 -- RLS: each user can only see and manage their own rows
 ALTER TABLE public.church_users ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "church_users_select_own"
+DROP POLICY IF EXISTS "church_users_select_own" ON public.church_users;
+CREATE POLICY "church_users_select_own"
   ON public.church_users FOR SELECT
   USING (user_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "church_users_insert_own"
+DROP POLICY IF EXISTS "church_users_insert_own" ON public.church_users;
+CREATE POLICY "church_users_insert_own"
   ON public.church_users FOR INSERT
   WITH CHECK (user_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "church_users_delete_own"
+DROP POLICY IF EXISTS "church_users_delete_own" ON public.church_users;
+CREATE POLICY "church_users_delete_own"
   ON public.church_users FOR DELETE
   USING (user_id = auth.uid());
 
@@ -35,14 +38,17 @@ CREATE POLICY IF NOT EXISTS "church_users_delete_own"
 -- (no strict RLS on churches for Day 1 per requirements)
 ALTER TABLE public.churches ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "churches_select_all"
+DROP POLICY IF EXISTS "churches_select_all" ON public.churches;
+CREATE POLICY "churches_select_all"
   ON public.churches FOR SELECT
   USING (true);
 
-CREATE POLICY IF NOT EXISTS "churches_insert_authenticated"
+DROP POLICY IF EXISTS "churches_insert_authenticated" ON public.churches;
+CREATE POLICY "churches_insert_authenticated"
   ON public.churches FOR INSERT
   WITH CHECK (auth.uid() IS NOT NULL);
 
-CREATE POLICY IF NOT EXISTS "churches_update_authenticated"
+DROP POLICY IF EXISTS "churches_update_authenticated" ON public.churches;
+CREATE POLICY "churches_update_authenticated"
   ON public.churches FOR UPDATE
   USING (true);
