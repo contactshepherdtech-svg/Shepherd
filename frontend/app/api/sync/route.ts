@@ -84,8 +84,50 @@ type PcoCheckin = {
   attended_at: string | null;
 };
 
+// The only Planning Center-specific mapping in the application. Downstream
+// records receive the returned UUID, never a PCO identifier.
+async function resolvePcoPeople(
+  db: DbClient,
+  churchId: number,
+  imported: PcoPerson[],
+): Promise<Map<string, string>> {
+  const externalIds = imported.map((person) => person.pco_id);
+  const { data, error } = await db
+    .from("external_identities")
+    .select("external_id,person_id")
+    .eq("church_id", churchId)
+    .eq("provider", "planning_center")
+    .in("external_id", externalIds);
+  assertNoSupabaseError(error, "Could not resolve Planning Center identities");
+  const resolved = new Map(
+    ((data ?? []) as Array<{ external_id: string; person_id: string }>).map((row) => [row.external_id, row.person_id]),
+  );
+
+  for (const importedPerson of imported) {
+    if (resolved.has(importedPerson.pco_id)) continue;
+    const { data: person, error: personError } = await db
+      .from("people")
+      .insert({ church_id: churchId, full_name: importedPerson.name, email: importedPerson.email } as never)
+      .select("person_id")
+      .single();
+    assertNoSupabaseError(personError, "Could not create imported person");
+    const personId = (person as unknown as { person_id?: string } | null)?.person_id;
+    if (!personId) throw new Error("Imported person insert returned no person_id.");
+    const { error: identityError } = await db.from("external_identities").insert({
+      church_id: churchId,
+      person_id: personId,
+      provider: "planning_center",
+      external_id: importedPerson.pco_id,
+    } as never);
+    assertNoSupabaseError(identityError, "Could not store Planning Center identity");
+    resolved.set(importedPerson.pco_id, personId);
+  }
+  return resolved;
+}
+
 type MemberForSync = {
   id: number;
+  person_id: string;
   pco_id: string | null;
   name: string | null;
   email: string | null;
@@ -505,9 +547,11 @@ async function upsertMembers(
   db: DbClient,
   churchId: number,
   people: PcoPerson[],
+  personIds: Map<string, string>,
   now: string,
 ): Promise<number> {
   const payloads: MemberInsert[] = people.map((person) => ({
+    person_id: personIds.get(person.pco_id)!,
     church_id: churchId,
     pco_id: person.pco_id,
     name: person.name,
@@ -533,14 +577,20 @@ async function upsertAttendance(
   db: DbClient,
   churchId: number,
   checkins: PcoCheckin[],
+  personIds: Map<string, string>,
 ): Promise<number> {
-  const payloads: AttendanceInsert[] = checkins.map((checkin) => ({
+  const payloads: AttendanceInsert[] = checkins.flatMap((checkin) => {
+    const personId = checkin.member_pco_id ? personIds.get(checkin.member_pco_id) : undefined;
+    if (!personId) return [];
+    return [{
+      person_id: personId,
     church_id: churchId,
     pco_checkin_id: checkin.pco_checkin_id,
     member_pco_id: checkin.member_pco_id,
     attended_at: checkin.attended_at,
-    source: "planning_center",
-  }));
+      source: "planning_center",
+    }];
+  });
 
   for (const group of chunk(payloads, 500)) {
     const { error } = await db
@@ -900,6 +950,7 @@ async function recalculateRiskScores(
 
     const risk = calculateRisk(member, attendanceByMember.get(member.pco_id) ?? [], settings, new Date(now));
     riskPayloads.push({
+      person_id: member.person_id,
       church_id: churchId,
       member_pco_id: member.pco_id,
       score: risk.score,
@@ -1087,14 +1138,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     console.log("[sync] Attendance fetched count:", checkins.length);
 
     const lastSync = new Date().toISOString();
-    membersImported = await upsertMembers(serviceDb, churchId, people, lastSync);
-    attendanceImported = await upsertAttendance(serviceDb, churchId, checkins);
+    const personIds = await resolvePcoPeople(serviceDb, churchId, people);
+    membersImported = await upsertMembers(serviceDb, churchId, people, personIds, lastSync);
+    attendanceImported = await upsertAttendance(serviceDb, churchId, checkins, personIds);
 
     const [members, attendanceRows] = await Promise.all([
       fetchAllPages<MemberForSync>(async (from, to) => {
         const { data, error } = await serviceDb!
           .from("members")
-          .select("id,pco_id,name,email,status,pco_created_at,first_visit_date,visitor_status,member_lifecycle")
+          .select("id,person_id,pco_id,name,email,status,pco_created_at,first_visit_date,visitor_status,member_lifecycle")
           .eq("church_id", churchId!)
           .not("pco_id", "is", null)
           .order("id", { ascending: true })

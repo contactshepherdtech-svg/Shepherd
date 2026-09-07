@@ -33,9 +33,22 @@ export type Database = {
         };
         Relationships: [];
       };
+      people: {
+        Row: { person_id: string; church_id: number; full_name: string; email: string | null; phone: string | null; normalized_email: string | null; normalized_phone: string | null; created_at: string; updated_at: string };
+        Insert: { person_id?: string; church_id: number; full_name: string; email?: string | null; phone?: string | null; created_at?: string; updated_at?: string };
+        Update: { full_name?: string; email?: string | null; phone?: string | null; updated_at?: string };
+        Relationships: [];
+      };
+      external_identities: {
+        Row: { id: number; church_id: number; person_id: string; provider: string; external_id: string; created_at: string; updated_at: string };
+        Insert: { id?: number; church_id: number; person_id: string; provider: string; external_id: string; created_at?: string; updated_at?: string };
+        Update: { person_id?: string; provider?: string; external_id?: string; updated_at?: string };
+        Relationships: [];
+      };
       members: {
         Row: {
           id: number;
+          person_id: string;
           church_id: number | null;
           pco_id: string | null;
           name: string | null;
@@ -52,6 +65,7 @@ export type Database = {
         };
         Insert: {
           id?: number;
+          person_id: string;
           church_id?: number | null;
           pco_id?: string | null;
           name?: string | null;
@@ -68,6 +82,7 @@ export type Database = {
         };
         Update: {
           id?: number;
+          person_id?: string;
           church_id?: number | null;
           pco_id?: string | null;
           name?: string | null;
@@ -86,6 +101,7 @@ export type Database = {
       attendance: {
         Row: {
           id: number;
+          person_id: string;
           church_id: number | null;
           pco_checkin_id: string | null;
           member_pco_id: string | null;
@@ -95,6 +111,7 @@ export type Database = {
         };
         Insert: {
           id?: number;
+          person_id: string;
           church_id?: number | null;
           pco_checkin_id?: string | null;
           member_pco_id?: string | null;
@@ -104,6 +121,7 @@ export type Database = {
         };
         Update: {
           id?: number;
+          person_id?: string;
           church_id?: number | null;
           pco_checkin_id?: string | null;
           member_pco_id?: string | null;
@@ -115,6 +133,7 @@ export type Database = {
       risk_scores: {
         Row: {
           id: number;
+          person_id: string;
           church_id: number | null;
           member_pco_id: string | null;
           score: number | null;
@@ -124,6 +143,7 @@ export type Database = {
         };
         Insert: {
           id?: number;
+          person_id: string;
           church_id?: number | null;
           member_pco_id?: string | null;
           score?: number | null;
@@ -133,6 +153,7 @@ export type Database = {
         };
         Update: {
           id?: number;
+          person_id?: string;
           church_id?: number | null;
           member_pco_id?: string | null;
           score?: number | null;

@@ -57,6 +57,7 @@ export type FirstVisitFollowUpState = "holding" | "due_now" | "draft_created";
 export type MemberDirectoryRow = {
   member: {
     id: string;
+    person_id: string;
     // True integer members.id (PK). `id` above carries pco_id || String(id) for
     // display/keying; db_id is the real FK target the assign form must post.
     db_id: number;
@@ -451,28 +452,28 @@ export function buildMemberDirectoryRows(
   riskScores: RiskScoreRow[],
   attendance: AttendanceRow[],
 ): MemberDirectoryRow[] {
-  const riskByMemberPcoId = new Map(
+  const riskByPersonId = new Map(
     riskScores
-      .filter((risk) => risk.member_pco_id)
-      .map((risk) => [risk.member_pco_id as string, risk]),
+      .filter((risk) => risk.person_id)
+      .map((risk) => [risk.person_id as string, risk]),
   );
 
-  const attendanceByMemberPcoId = attendance.reduce<Map<string, Date[]>>((map, row) => {
-    if (!row.member_pco_id) return map;
-    const existing = map.get(row.member_pco_id) ?? [];
+  const attendanceByPersonId = attendance.reduce<Map<string, Date[]>>((map, row) => {
+    if (!row.person_id) return map;
+    const existing = map.get(row.person_id) ?? [];
     const parsedDate = getSafeDate(row.attended_at);
     if (parsedDate) {
       existing.push(parsedDate);
-      map.set(row.member_pco_id, existing);
+      map.set(row.person_id, existing);
     }
     return map;
   }, new Map());
 
   const rows = members.reduce<MemberDirectoryRow[]>((acc, member) => {
-    const memberId = member.pco_id || String(member.id);
-    const memberRisk = member.pco_id ? riskByMemberPcoId.get(member.pco_id) : undefined;
+    const memberId = member.person_id;
+    const memberRisk = riskByPersonId.get(member.person_id);
 
-    const attendanceHistory = [...(member.pco_id ? attendanceByMemberPcoId.get(member.pco_id) ?? [] : [])].sort(
+    const attendanceHistory = [...(attendanceByPersonId.get(member.person_id) ?? [])].sort(
       (left, right) => right.getTime() - left.getTime(),
     );
 
@@ -481,6 +482,7 @@ export function buildMemberDirectoryRows(
     acc.push({
       member: {
         id: memberId,
+        person_id: member.person_id,
         db_id: member.id,
         pco_id: member.pco_id,
         name: member.name?.trim() || "Unknown member",
@@ -493,7 +495,7 @@ export function buildMemberDirectoryRows(
         last_followup_at: getSafeDate(member.last_followup_at),
       },
       risk: {
-        member_id: memberRisk?.member_pco_id || memberId,
+        member_id: memberRisk?.person_id || memberId,
         score: memberRisk?.score ?? null,
         tier: memberRisk ? normalizeTier(memberRisk.tier) : null,
         reasons: parseReasons(memberRisk?.reasons),

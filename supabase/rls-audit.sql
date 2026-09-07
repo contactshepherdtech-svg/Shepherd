@@ -6,7 +6,7 @@ DECLARE
   table_name text;
   required_tables text[] := ARRAY[
     'churches', 'church_users', 'members', 'attendance', 'risk_scores',
-    'church_settings', 'integration_tokens', 'outreach_status',
+    'church_settings', 'integration_tokens', 'people', 'external_identities', 'outreach_status',
     'outreach_history', 'sync_history', 'church_invitations', 'assignments',
     'assignment_notes', 'access_requests'
   ];
@@ -14,6 +14,8 @@ DECLARE
     'church_users_select_own', 'churches_select_own_church',
     'members_select_own_church', 'attendance_select_own_church',
     'risk_scores_select_own_church', 'church_settings_select_own_church',
+    'people_select_own_church', 'people_insert_staff',
+    'external_identities_select_own_church', 'external_identities_write_staff',
     'integration_tokens_select_own_church', 'outreach_status_select_own_church',
     'outreach_history_select_own_church', 'sync_history_select_own_church',
     'assignments_select_staff', 'assignment_notes_select_staff',

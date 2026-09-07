@@ -13,6 +13,7 @@ export const navItems: NavItem[] = [
   { href: "/ask", label: "Ask", icon: Sparkles },
   { href: "/dashboard", label: "Dashboard", icon: Gauge },
   { href: "/members", label: "Members", icon: Users },
+  { href: "/people", label: "People", icon: Users },
   { href: "/priority", label: "Priority", icon: Siren },
   { href: "/assignments", label: "Assignments", icon: ListChecks },
   { href: "/staff", label: "Staff", icon: UserCog },
